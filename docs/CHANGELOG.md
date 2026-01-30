@@ -35,6 +35,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Version numbers 
 - `pixery regen-thumbs` CLI command to regenerate existing thumbnails
 - Trash feature: images are soft-deleted instead of permanently removed
 - Confirmation dialog before trashing (replaces browser confirm)
+- Right-click context menu on gallery thumbnails (Star/Unstar, Trash)
 
 ### Changed
 - Single-click on thumbnail now opens details panel (was double-click)

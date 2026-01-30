@@ -5,10 +5,10 @@ interface ThumbnailProps {
   generation: Generation;
   selected: boolean;
   onClick: () => void;
-  onDoubleClick: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }
 
-export function Thumbnail({ generation, selected, onClick, onDoubleClick }: ThumbnailProps) {
+export function Thumbnail({ generation, selected, onClick, onContextMenu }: ThumbnailProps) {
   const imageSrc = generation.thumb_path
     ? getImageUrl(generation.thumb_path)
     : getImageUrl(generation.image_path);
@@ -17,7 +17,7 @@ export function Thumbnail({ generation, selected, onClick, onDoubleClick }: Thum
     <div
       className={`thumbnail ${selected ? 'thumbnail-selected' : ''}`}
       onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
     >
       <img src={imageSrc} alt={generation.slug} loading="lazy" />
       {generation.starred && <span className="thumbnail-star">★</span>}

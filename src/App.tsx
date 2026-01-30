@@ -12,6 +12,7 @@ import { GenerateForm } from './components/GenerateForm';
 import { Compare } from './components/Compare';
 import { Dashboard } from './components/Dashboard';
 import { Cheatsheet } from './components/Cheatsheet';
+import { ContextMenu } from './components/ContextMenu';
 
 type View = 'gallery' | 'compare' | 'dashboard';
 
@@ -31,6 +32,10 @@ export default function App() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showHelp, setShowHelp] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    generation: Generation;
+    position: { x: number; y: number };
+  } | null>(null);
 
   // Models
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -137,6 +142,21 @@ export default function App() {
     refresh();
   }, [selectedId, refresh]);
 
+  // Context menu handlers (work with any generation)
+  const handleContextMenuToggleStar = useCallback(async (id: number) => {
+    await api.toggleStarred(id);
+    refresh();
+  }, [refresh]);
+
+  const handleContextMenuTrash = useCallback(async (id: number) => {
+    await api.trashGeneration(id);
+    if (selectedId === id) {
+      setSelectedId(null);
+      setDetailsOpen(false);
+    }
+    refresh();
+  }, [selectedId, refresh]);
+
   const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[]) => {
     const result = await generate({
       prompt,
@@ -176,7 +196,9 @@ export default function App() {
     onFocusSearch: () => document.getElementById('search-input')?.focus(),
     onShowHelp: () => setShowHelp(true),
     onEscape: () => {
-      if (showHelp) {
+      if (contextMenu) {
+        setContextMenu(null);
+      } else if (showHelp) {
         setShowHelp(false);
       } else if (view !== 'gallery') {
         setView('gallery');
@@ -239,6 +261,9 @@ export default function App() {
             setSelectedId(id);
             setDetailsOpen(true);
           }}
+          onContextMenu={(generation, position) => {
+            setContextMenu({ generation, position });
+          }}
           loading={loading}
         />
       </main>
@@ -274,6 +299,16 @@ export default function App() {
 
       {showHelp && (
         <Cheatsheet onClose={() => setShowHelp(false)} />
+      )}
+
+      {contextMenu && (
+        <ContextMenu
+          generation={contextMenu.generation}
+          position={contextMenu.position}
+          onClose={() => setContextMenu(null)}
+          onToggleStar={() => handleContextMenuToggleStar(contextMenu.generation.id)}
+          onTrash={() => handleContextMenuTrash(contextMenu.generation.id)}
+        />
       )}
 
       <style>{`

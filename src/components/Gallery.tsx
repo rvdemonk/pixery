@@ -6,10 +6,11 @@ interface GalleryProps {
   generations: Generation[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  onContextMenu: (generation: Generation, position: { x: number; y: number }) => void;
   loading: boolean;
 }
 
-export function Gallery({ generations, selectedId, onSelect, loading }: GalleryProps) {
+export function Gallery({ generations, selectedId, onSelect, onContextMenu, loading }: GalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Scroll selected item into view
@@ -45,6 +46,10 @@ export function Gallery({ generations, selectedId, onSelect, loading }: GalleryP
             generation={gen}
             selected={gen.id === selectedId}
             onClick={() => onSelect(gen.id)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onContextMenu(gen, { x: e.clientX, y: e.clientY });
+            }}
           />
         </div>
       ))}
