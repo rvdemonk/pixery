@@ -2,11 +2,13 @@ use anyhow::{Context, Result};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::models::GenerationResult;
 
 const API_BASE: &str = "https://queue.fal.run";
+const POLL_INTERVAL_MS: u64 = 500;
+const MAX_POLL_ATTEMPTS: u32 = 240; // 2 minutes max
 
 /// Model ID mapping for fal.ai models
 ///
@@ -49,17 +51,21 @@ struct FalRequest {
     strength: Option<f64>,
 }
 
-#[derive(Deserialize)]
+/// Response from fal.ai - can be either a queue status or the final result
+#[derive(Deserialize, Debug)]
 struct FalResponse {
+    // Queue status fields
+    status: Option<String>,
+    response_url: Option<String>,
+    // Result fields
     images: Option<Vec<FalImage>>,
+    seed: Option<u64>,
     error: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct FalImage {
     url: String,
-    #[serde(default)]
-    seed: Option<u64>,
 }
 
 fn get_api_key() -> Result<String> {
@@ -120,10 +126,70 @@ pub async fn generate(
         anyhow::bail!("fal.ai API error {}: {}", status, text);
     }
 
-    let data: FalResponse = response.json().await.context("Failed to parse fal.ai response")?;
+    let mut data: FalResponse = response.json().await.context("Failed to parse fal.ai response")?;
 
-    if let Some(error) = data.error {
+    if let Some(error) = &data.error {
         anyhow::bail!("fal.ai API error: {}", error);
+    }
+
+    // Handle queue-based response - poll until complete
+    if data.status.as_deref() == Some("IN_QUEUE") || data.status.as_deref() == Some("IN_PROGRESS") {
+        let response_url = data
+            .response_url
+            .ok_or_else(|| anyhow::anyhow!("Queue response missing response_url"))?;
+
+        for attempt in 0..MAX_POLL_ATTEMPTS {
+            tokio::time::sleep(Duration::from_millis(POLL_INTERVAL_MS)).await;
+
+            let poll_response = client
+                .get(&response_url)
+                .header("Authorization", format!("Key {}", api_key))
+                .timeout(Duration::from_secs(30))
+                .send()
+                .await
+                .context("Failed to poll fal.ai queue")?;
+
+            let poll_status = poll_response.status();
+            if !poll_status.is_success() {
+                // 202 means still processing
+                if poll_status.as_u16() == 202 {
+                    continue;
+                }
+                // 400 with "still in progress" also means keep waiting
+                if poll_status.as_u16() == 400 {
+                    let text = poll_response.text().await.unwrap_or_default();
+                    if text.contains("still in progress") {
+                        continue;
+                    }
+                    anyhow::bail!("fal.ai poll error {}: {}", poll_status, text);
+                }
+                let text = poll_response.text().await.unwrap_or_default();
+                anyhow::bail!("fal.ai poll error {}: {}", poll_status, text);
+            }
+
+            data = poll_response.json().await.context("Failed to parse poll response")?;
+
+            if let Some(error) = &data.error {
+                anyhow::bail!("fal.ai API error: {}", error);
+            }
+
+            // Check if we have images now
+            if data.images.is_some() {
+                break;
+            }
+
+            // Still in queue
+            if data.status.as_deref() == Some("IN_QUEUE")
+                || data.status.as_deref() == Some("IN_PROGRESS")
+            {
+                continue;
+            }
+
+            // Unknown status with no images
+            if attempt == MAX_POLL_ATTEMPTS - 1 {
+                anyhow::bail!("Timeout waiting for fal.ai generation");
+            }
+        }
     }
 
     // Get image URL from response
@@ -135,7 +201,7 @@ pub async fn generate(
     // Fetch the actual image
     let image_response = client
         .get(&image_info.url)
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(Duration::from_secs(30))
         .send()
         .await
         .context("Failed to fetch image from fal.ai")?;
@@ -154,7 +220,7 @@ pub async fn generate(
 
     Ok(GenerationResult {
         image_data,
-        seed: image_info.seed.map(|s| s.to_string()),
+        seed: data.seed.map(|s| s.to_string()),
         generation_time_seconds: elapsed,
     })
 }
