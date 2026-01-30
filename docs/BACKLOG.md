@@ -13,7 +13,9 @@ Prioritized work items for Pixery. Tags: `#bug`, `#tech-debt`, `#feature`, `#ux`
 
 Critical issues that must be fixed before next release.
 
-*None currently.*
+- [ ] `#bug` Gallery not auto-refreshing on new generations - FSEvents watcher not triggering updates; still requires manual tag toggle workaround
+
+- [ ] `#bug` Regenerate should include original reference images - when clicking regenerate in details, resend the same refs used in the original generation
 
 ---
 
@@ -29,11 +31,21 @@ Items currently being worked on.
 
 High priority items to tackle next.
 
-- [ ] `#ux` **Tidy up GUI layout** - banner in sidebar looks off, gallery and details columns have uneven heights. Clean up visual balance.
+- [ ] `#ux` Expandable sidebar rework - research better patterns, current implementation is tacky
 
-- [ ] `#ux` **Single-click image selection** - change image selection to open detail view on single click instead of double click. More intuitive.
+- [ ] `#ux` Sidebar expansion behavior - hamburger icon must stay in place (don't move/remove buttons); click to pin expansion; only when pinned should gallery thumbs shift to make room; unpinned = overlay only
 
-- [ ] `#feature` **Markdown renderer for prompts** - add markdown rendering to prompt display in detail view. Prompts often have structure that would benefit from formatting.
+- [ ] `#ux` Details close button - make X button larger, follow best practices for dismiss targets
+
+- [ ] `#ux` Shared close button component - create reusable X button for all closeable elements (cost dashboard, popups, detail column)
+
+- [ ] `#ux` Collapsible prompt in details - full prompt should require expansion, not show automatically
+
+- [ ] `#ux` Reference image lineage in details - show reference images as small clickable thumbnails next to prompts (data already in DB via references table)
+
+- [ ] `#feature` Settings dashboard - popup like cost dashboard with dropdowns/toggles; settings button (cog icon) appears next to cost (coin icon) in header
+
+- [ ] `#feature` Hidden tags setting - option in settings to hide specific tags; when enabled, hides images with those tags from gallery and search, hides tags from sidebar; requires "hidden_tags" infra (stored preference + filter logic)
 
 ---
 
@@ -68,6 +80,11 @@ Ideas and features for future consideration.
 ## Completed
 
 Items shipped, organized by version.
+
+### Unreleased
+- [x] Markdown rendering for prompts in details panel
+- [x] Single-click opens details (was double-click)
+- [x] Unified column headers (consistent height across sidebar, gallery, details)
 
 ### v0.1.0
 - [x] Initial project structure
