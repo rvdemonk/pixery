@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Generation, ModelInfo } from '../lib/types';
 import { getImageUrl } from '../lib/api';
 import { TagChips } from './TagChips';
@@ -29,6 +29,13 @@ export function Details({
   const [editingPrompt, setEditingPrompt] = useState(false);
   const [promptValue, setPromptValue] = useState(generation.prompt);
   const [selectedModel, setSelectedModel] = useState(generation.model);
+
+  // Sync local state when selected generation changes
+  useEffect(() => {
+    setPromptValue(generation.prompt);
+    setSelectedModel(generation.model);
+    setEditingPrompt(false);
+  }, [generation.id]);
 
   const handlePromptSave = () => {
     if (promptValue !== generation.prompt) {

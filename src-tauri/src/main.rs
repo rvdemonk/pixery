@@ -12,6 +12,14 @@ struct Args {
 }
 
 fn main() {
+    // Load ~/.env for API keys
+    if let Some(home) = dirs::home_dir() {
+        let env_path = home.join(".env");
+        if env_path.exists() {
+            let _ = dotenvy::from_path(&env_path);
+        }
+    }
+
     let args = Args::parse();
 
     match args.command {

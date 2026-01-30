@@ -138,6 +138,10 @@ pub enum Commands {
         #[arg(short, long)]
         tags: Option<String>,
 
+        /// Reference image(s) used for this generation
+        #[arg(short, long = "ref")]
+        reference: Vec<PathBuf>,
+
         /// Override date (YYYY-MM-DD), otherwise extracted from filename or uses today
         #[arg(long)]
         date: Option<String>,
@@ -330,6 +334,7 @@ pub fn run(cmd: Commands) -> Result<()> {
             prompt_file,
             model,
             tags,
+            reference,
             date,
             time,
         } => {
@@ -349,7 +354,12 @@ pub fn run(cmd: Commands) -> Result<()> {
                 .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
                 .unwrap_or_default();
 
-            import_image(&db, &file, &prompt_text, &model, &tag_list, date.as_deref(), time.as_deref())?;
+            let ref_paths: Vec<String> = reference
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
+
+            import_image(&db, &file, &prompt_text, &model, &tag_list, &ref_paths, date.as_deref(), time.as_deref())?;
         }
     }
 
@@ -437,6 +447,7 @@ fn import_image(
     prompt: &str,
     model: &str,
     tags: &[String],
+    reference_paths: &[String],
     date_override: Option<&str>,
     time_override: Option<&str>,
 ) -> Result<()> {
@@ -508,9 +519,19 @@ fn import_image(
         db.add_tags(gen_id, tags)?;
     }
 
+    // Store and link reference images
+    for ref_path in reference_paths {
+        let (hash, stored_path) = archive::store_reference(std::path::Path::new(ref_path))?;
+        let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap())?;
+        db.link_reference(gen_id, ref_id)?;
+    }
+
     println!("Imported: {} (ID: {})", image_path.display(), gen_id);
     println!("  Source: {}", source_path.display());
     println!("  Date: {} Time: {}", date, time_str);
+    if !reference_paths.is_empty() {
+        println!("  References: {}", reference_paths.len());
+    }
 
     Ok(())
 }
