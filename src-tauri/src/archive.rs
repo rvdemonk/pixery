@@ -92,8 +92,22 @@ pub fn save_image(
         _ => "png",
     };
 
-    let filename = generate_filename(slug, timestamp, extension);
-    let image_path = dir.join(&filename);
+    let base_filename = generate_filename(slug, timestamp, extension);
+    let mut image_path = dir.join(&base_filename);
+
+    // Handle filename collisions by appending a counter
+    if image_path.exists() {
+        let stem = format!("{}-{}", slug, timestamp.split('T').nth(1).unwrap_or("000000").replace(':', "").chars().take(6).collect::<String>());
+        let mut counter = 1;
+        loop {
+            let filename = format!("{}-{}.{}", stem, counter, extension);
+            image_path = dir.join(&filename);
+            if !image_path.exists() {
+                break;
+            }
+            counter += 1;
+        }
+    }
 
     fs::write(&image_path, data).context("Failed to write image file")?;
 
@@ -108,9 +122,12 @@ pub fn save_image(
     Ok((image_path, thumb_path, width as i32, height as i32, file_size))
 }
 
+/// Thumbnail size in pixels (400px for Retina display support)
+pub const THUMBNAIL_SIZE: u32 = 400;
+
 /// Generate a thumbnail for an image
 fn generate_thumbnail(image_path: &Path, img: &image::DynamicImage) -> Result<Option<PathBuf>> {
-    let thumb = img.thumbnail(200, 200);
+    let thumb = img.thumbnail(THUMBNAIL_SIZE, THUMBNAIL_SIZE);
 
     let stem = image_path
         .file_stem()

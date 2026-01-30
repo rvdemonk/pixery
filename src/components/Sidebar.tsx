@@ -19,8 +19,15 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <aside className="sidebar">
-      <div className="sidebar-header">
-        <h1 className="sidebar-title">imagen</h1>
+      <div className="sidebar-hamburger">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <rect y="3" width="20" height="2" rx="1" />
+          <rect y="9" width="20" height="2" rx="1" />
+          <rect y="15" width="20" height="2" rx="1" />
+        </svg>
+      </div>
+      <div className="column-header">
+        <h1 className="sidebar-title">pixery</h1>
       </div>
 
       <div className="sidebar-section">
@@ -67,12 +74,26 @@ export function Sidebar({
       </div>
 
       <style>{`
-        .sidebar-header {
-          padding: var(--spacing-md);
-          border-bottom: 1px solid var(--border);
+        .sidebar-hamburger {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 56px;
+          color: var(--text-muted);
+          flex-shrink: 0;
+          cursor: pointer;
+          transition: opacity var(--transition-fast);
+        }
+        .sidebar-hamburger:hover {
+          color: var(--text-primary);
+        }
+        .sidebar:hover .sidebar-hamburger {
+          opacity: 0;
+          pointer-events: none;
+          position: absolute;
         }
         .sidebar-title {
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 700;
           color: var(--accent);
         }

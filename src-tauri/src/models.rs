@@ -39,70 +39,80 @@ pub struct ModelInfo {
     pub provider: Provider,
     pub display_name: String,
     pub cost_per_image: f64,
+    /// Max reference images supported (0 = text-to-image only)
+    pub max_refs: u32,
 }
 
 impl ModelInfo {
     pub fn all() -> Vec<ModelInfo> {
         vec![
-            // Gemini models
+            // Gemini models - support multiple reference images
             ModelInfo {
                 id: "gemini-flash".into(),
                 provider: Provider::Gemini,
                 display_name: "Gemini 2.5 Flash".into(),
                 cost_per_image: 0.039,
+                max_refs: 10,
             },
             ModelInfo {
                 id: "gemini-pro".into(),
                 provider: Provider::Gemini,
                 display_name: "Gemini 3 Pro".into(),
                 cost_per_image: 0.134,
+                max_refs: 10,
             },
-            // fal.ai models
+            // fal.ai models - text-to-image only (no ref support)
             ModelInfo {
                 id: "fal-ai/flux/schnell".into(),
                 provider: Provider::Fal,
                 display_name: "FLUX Schnell".into(),
                 cost_per_image: 0.003,
+                max_refs: 0,
             },
             ModelInfo {
                 id: "fal-ai/flux-pro/v1.1".into(),
                 provider: Provider::Fal,
                 display_name: "FLUX Pro 1.1".into(),
                 cost_per_image: 0.05,
+                max_refs: 0,
             },
             ModelInfo {
                 id: "fal-ai/flux-pro/v1.1-ultra".into(),
                 provider: Provider::Fal,
                 display_name: "FLUX Pro 1.1 Ultra".into(),
                 cost_per_image: 0.06,
+                max_refs: 0,
             },
             ModelInfo {
                 id: "fal-ai/recraft-v3".into(),
                 provider: Provider::Fal,
                 display_name: "Recraft V3".into(),
                 cost_per_image: 0.04,
+                max_refs: 0,
             },
-            // Z-Image Turbo: $0.005/MP, ~$0.005 for 1MP (1024x1024)
-            // Only Turbo variant publicly available. Routes to image-to-image endpoint when ref provided.
-            // Max 1 reference image. Params: strength (0-1), num_inference_steps (1-8)
+            // Z-Image Turbo: $0.005/MP. Routes to image-to-image endpoint when ref provided.
+            // Max 1 reference image.
             ModelInfo {
                 id: "fal-ai/z-image/turbo".into(),
                 provider: Provider::Fal,
                 display_name: "Z-Image Turbo".into(),
                 cost_per_image: 0.005,
+                max_refs: 1,
             },
-            // OpenAI models
+            // OpenAI models - text-to-image only
             ModelInfo {
                 id: "dall-e-3".into(),
                 provider: Provider::OpenAI,
                 display_name: "DALL-E 3".into(),
                 cost_per_image: 0.04,
+                max_refs: 0,
             },
             ModelInfo {
                 id: "gpt-image-1".into(),
                 provider: Provider::OpenAI,
                 display_name: "GPT Image 1".into(),
                 cost_per_image: 0.02,
+                max_refs: 0,
             },
         ]
     }

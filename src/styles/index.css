@@ -86,13 +86,32 @@ textarea {
 }
 
 .sidebar {
-  width: 240px;
+  position: relative;
+  width: 48px;
   flex-shrink: 0;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width var(--transition-normal);
+}
+
+.sidebar:hover {
+  width: 240px;
+}
+
+.sidebar .column-header,
+.sidebar .sidebar-section,
+.sidebar .sidebar-footer {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.sidebar:hover .column-header,
+.sidebar:hover .sidebar-section,
+.sidebar:hover .sidebar-footer {
+  opacity: 1;
 }
 
 .main-content {
@@ -108,6 +127,22 @@ textarea {
   width: 360px;
   flex-shrink: 0;
   overflow-y: auto;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 var(--spacing-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.column-header h1,
+.column-header h2 {
+  font-size: 16px;
+  font-weight: 600;
 }
 
 /* Typography */

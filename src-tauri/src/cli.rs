@@ -396,12 +396,17 @@ pub fn run(cmd: Commands) -> Result<()> {
 
         Commands::Models => {
             let models = ModelInfo::all();
-            println!("{:<30} {:<10} {:>12}", "MODEL ID", "PROVIDER", "COST");
-            println!("{}", "-".repeat(54));
+            println!("{:<30} {:<10} {:>8} {:>8}", "MODEL ID", "PROVIDER", "COST", "REFS");
+            println!("{}", "-".repeat(60));
             for m in models {
+                let refs_str = if m.max_refs == 0 {
+                    "-".to_string()
+                } else {
+                    format!("{}", m.max_refs)
+                };
                 println!(
-                    "{:<30} {:<10} ${:>10.3}",
-                    m.id, m.provider, m.cost_per_image
+                    "{:<30} {:<10} ${:>6.3} {:>8}",
+                    m.id, m.provider, m.cost_per_image, refs_str
                 );
             }
         }
