@@ -10,6 +10,7 @@ interface DetailsProps {
   onClose: () => void;
   onToggleStar: () => void;
   onUpdatePrompt: (prompt: string) => void;
+  onUpdateTitle: (title: string | null) => void;
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onRegenerate: (model: string) => void;
@@ -22,21 +23,26 @@ export function Details({
   onClose,
   onToggleStar,
   onUpdatePrompt,
+  onUpdateTitle,
   onAddTag,
   onRemoveTag,
   onRegenerate,
   onTrash,
 }: DetailsProps) {
   const [editingPrompt, setEditingPrompt] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
   const [promptValue, setPromptValue] = useState(generation.prompt);
+  const [titleValue, setTitleValue] = useState(generation.title || '');
   const [selectedModel, setSelectedModel] = useState(generation.model);
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
 
   // Sync local state when selected generation changes
   useEffect(() => {
     setPromptValue(generation.prompt);
+    setTitleValue(generation.title || '');
     setSelectedModel(generation.model);
     setEditingPrompt(false);
+    setEditingTitle(false);
     setShowTrashConfirm(false);
   }, [generation.id]);
 
@@ -45,6 +51,23 @@ export function Details({
       onUpdatePrompt(promptValue);
     }
     setEditingPrompt(false);
+  };
+
+  const handleTitleSave = () => {
+    const newTitle = titleValue.trim() || null;
+    if (newTitle !== generation.title) {
+      onUpdateTitle(newTitle);
+    }
+    setEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      setTitleValue(generation.title || '');
+      setEditingTitle(false);
+    }
   };
 
   const formatFileSize = (bytes: number | null) => {
@@ -66,6 +89,28 @@ export function Details({
       </div>
 
       <div className="details-content">
+        <div className="details-title-section">
+          {editingTitle ? (
+            <input
+              type="text"
+              className="title-input"
+              value={titleValue}
+              onChange={(e) => setTitleValue(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              placeholder="Add a title..."
+              autoFocus
+            />
+          ) : (
+            <div
+              className={`title-display ${!generation.title ? 'title-placeholder' : ''}`}
+              onClick={() => setEditingTitle(true)}
+            >
+              {generation.title || 'Click to add title...'}
+            </div>
+          )}
+        </div>
+
         <div className="details-section">
           <div className="details-row">
             <span className="details-label">ID</span>
@@ -221,6 +266,39 @@ export function Details({
           padding: var(--spacing-md);
           overflow-y: auto;
           flex: 1;
+        }
+        .details-title-section {
+          margin-bottom: var(--spacing-md);
+        }
+        .title-display {
+          font-size: 18px;
+          font-weight: 600;
+          padding: var(--spacing-xs) 0;
+          cursor: pointer;
+          border-bottom: 1px solid transparent;
+          transition: border-color var(--transition-fast);
+        }
+        .title-display:hover {
+          border-bottom-color: var(--border-light);
+        }
+        .title-placeholder {
+          color: var(--text-muted);
+          font-weight: 400;
+          font-style: italic;
+        }
+        .title-input {
+          width: 100%;
+          font-size: 18px;
+          font-weight: 600;
+          padding: var(--spacing-xs);
+          background: var(--bg-primary);
+          border: 1px solid var(--accent);
+          border-radius: var(--radius-sm);
+          color: var(--text-primary);
+        }
+        .title-input:focus {
+          outline: none;
+          box-shadow: 0 0 0 2px var(--accent-muted);
         }
         .details-section {
           margin-bottom: var(--spacing-lg);

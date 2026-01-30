@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import type { Generation, ModelInfo, ListFilter } from './lib/types';
 import * as api from './lib/api';
 import { useGenerations } from './hooks/useGenerations';
@@ -51,6 +52,17 @@ export default function App() {
   useEffect(() => {
     api.listModels().then(setModels);
   }, []);
+
+  // Listen for new generations from CLI/external sources
+  useEffect(() => {
+    const unlisten = listen('generation-added', () => {
+      refresh();
+      refreshTags();
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [refresh, refreshTags]);
 
   // Update filter when tag/starred changes
   useEffect(() => {
@@ -113,6 +125,12 @@ export default function App() {
   const handleUpdatePrompt = useCallback(async (prompt: string) => {
     if (!selectedId) return;
     await api.updatePrompt(selectedId, prompt);
+    refresh();
+  }, [selectedId, refresh]);
+
+  const handleUpdateTitle = useCallback(async (title: string | null) => {
+    if (!selectedId) return;
+    await api.updateTitle(selectedId, title);
     refresh();
   }, [selectedId, refresh]);
 
@@ -291,6 +309,7 @@ export default function App() {
           onClose={() => setDetailsOpen(false)}
           onToggleStar={handleToggleStar}
           onUpdatePrompt={handleUpdatePrompt}
+          onUpdateTitle={handleUpdateTitle}
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onRegenerate={handleRegenerate}
