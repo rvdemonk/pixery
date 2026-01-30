@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+target/
+
+# Tauri generated
+src-tauri/gen/
+
+# OS files
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
