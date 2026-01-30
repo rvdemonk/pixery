@@ -6,11 +6,12 @@ interface GalleryProps {
   generations: Generation[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  onDoubleClick: (id: number) => void;
   onContextMenu: (generation: Generation, position: { x: number; y: number }) => void;
   loading: boolean;
 }
 
-export function Gallery({ generations, selectedId, onSelect, onContextMenu, loading }: GalleryProps) {
+export function Gallery({ generations, selectedId, onSelect, onDoubleClick, onContextMenu, loading }: GalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Scroll selected item into view
@@ -46,6 +47,7 @@ export function Gallery({ generations, selectedId, onSelect, onContextMenu, load
             generation={gen}
             selected={gen.id === selectedId}
             onClick={() => onSelect(gen.id)}
+            onDoubleClick={() => onDoubleClick(gen.id)}
             onContextMenu={(e) => {
               e.preventDefault();
               onContextMenu(gen, { x: e.clientX, y: e.clientY });
@@ -55,15 +57,13 @@ export function Gallery({ generations, selectedId, onSelect, onContextMenu, load
       ))}
       <style>{`
         .gallery {
-          column-width: 180px;
-          column-gap: var(--spacing-md);
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+          gap: var(--spacing-md);
           padding: var(--spacing-md);
           overflow-y: auto;
           flex: 1;
-        }
-        .gallery > div {
-          break-inside: avoid;
-          margin-bottom: var(--spacing-md);
+          align-content: start;
         }
       `}</style>
     </div>

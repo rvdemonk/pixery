@@ -13,6 +13,7 @@ import { Compare } from './components/Compare';
 import { Dashboard } from './components/Dashboard';
 import { Cheatsheet } from './components/Cheatsheet';
 import { ContextMenu } from './components/ContextMenu';
+import { Lightbox } from './components/Lightbox';
 
 type View = 'gallery' | 'compare' | 'dashboard';
 
@@ -32,6 +33,7 @@ export default function App() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showHelp, setShowHelp] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     generation: Generation;
     position: { x: number; y: number };
@@ -75,21 +77,29 @@ export default function App() {
   }, [generations, compareIds]);
 
   // Navigation
+  const currentIndex = useMemo(() => {
+    if (!selectedId || generations.length === 0) return -1;
+    return generations.findIndex((g) => g.id === selectedId);
+  }, [generations, selectedId]);
+
+  const hasNext = currentIndex >= 0 && currentIndex < generations.length - 1;
+  const hasPrevious = currentIndex > 0;
+
   const selectNext = useCallback(() => {
     if (generations.length === 0) return;
-    const currentIndex = selectedId
+    const idx = selectedId
       ? generations.findIndex((g) => g.id === selectedId)
       : -1;
-    const nextIndex = Math.min(currentIndex + 1, generations.length - 1);
+    const nextIndex = Math.min(idx + 1, generations.length - 1);
     setSelectedId(generations[nextIndex].id);
   }, [generations, selectedId]);
 
   const selectPrevious = useCallback(() => {
     if (generations.length === 0) return;
-    const currentIndex = selectedId
+    const idx = selectedId
       ? generations.findIndex((g) => g.id === selectedId)
       : generations.length;
-    const prevIndex = Math.max(currentIndex - 1, 0);
+    const prevIndex = Math.max(idx - 1, 0);
     setSelectedId(generations[prevIndex].id);
   }, [generations, selectedId]);
 
@@ -196,7 +206,9 @@ export default function App() {
     onFocusSearch: () => document.getElementById('search-input')?.focus(),
     onShowHelp: () => setShowHelp(true),
     onEscape: () => {
-      if (contextMenu) {
+      if (lightboxOpen) {
+        setLightboxOpen(false);
+      } else if (contextMenu) {
         setContextMenu(null);
       } else if (showHelp) {
         setShowHelp(false);
@@ -212,7 +224,7 @@ export default function App() {
       }
     },
     onDelete: handleTrash,
-  }, view === 'gallery' || showHelp);
+  }, (view === 'gallery' || showHelp) && !lightboxOpen);
 
   return (
     <div className="app-layout">
@@ -261,6 +273,10 @@ export default function App() {
             setSelectedId(id);
             setDetailsOpen(true);
           }}
+          onDoubleClick={(id) => {
+            setSelectedId(id);
+            setLightboxOpen(true);
+          }}
           onContextMenu={(generation, position) => {
             setContextMenu({ generation, position });
           }}
@@ -308,6 +324,17 @@ export default function App() {
           onClose={() => setContextMenu(null)}
           onToggleStar={() => handleContextMenuToggleStar(contextMenu.generation.id)}
           onTrash={() => handleContextMenuTrash(contextMenu.generation.id)}
+        />
+      )}
+
+      {lightboxOpen && selectedGeneration && (
+        <Lightbox
+          generation={selectedGeneration}
+          onClose={() => setLightboxOpen(false)}
+          onNext={selectNext}
+          onPrevious={selectPrevious}
+          hasNext={hasNext}
+          hasPrevious={hasPrevious}
         />
       )}
 
