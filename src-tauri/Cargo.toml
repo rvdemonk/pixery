@@ -36,6 +36,7 @@ slug = "0.1"
 thiserror = "1"
 anyhow = "1"
 regex = "1"
+notify-debouncer-mini = "0.4"
 
 [profile.release]
 strip = true

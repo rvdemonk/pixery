@@ -5,6 +5,7 @@ mod commands;
 pub mod db;
 pub mod models;
 pub mod providers;
+mod watcher;
 
 pub mod cli;
 
@@ -40,6 +41,12 @@ pub fn run() {
             commands::get_cost_summary,
             commands::get_image_path,
         ])
+        .setup(|app| {
+            // Start file watcher for auto-refresh
+            let generations_dir = archive::generations_dir();
+            watcher::start_watcher(app.handle().clone(), &generations_dir);
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
