@@ -8,14 +8,30 @@ use crate::models::GenerationResult;
 
 const API_BASE: &str = "https://queue.fal.run";
 
-/// Model ID mapping
-fn resolve_model(model: &str) -> &str {
+/// Model ID mapping for fal.ai models
+///
+/// # Z-Image Turbo
+/// - Text-to-image: `fal-ai/z-image/turbo` ($0.005/MP)
+/// - Image-to-image: `fal-ai/z-image/turbo/image-to-image` ($0.005/MP)
+/// - With LoRA: `fal-ai/z-image/turbo/lora` ($0.0085/MP)
+/// - Max 1 reference image for image-to-image
+/// - Parameters: num_images (1-4), num_inference_steps (1-8, default 8)
+/// - Image sizes: square, square_hd, portrait_4_3, portrait_16_9, landscape_4_3, landscape_16_9
+/// - Note: Only Turbo variant is publicly available. "Z-Image base" is not deployed.
+fn resolve_model(model: &str, has_reference: bool) -> &str {
     match model {
         "flux-schnell" => "fal-ai/flux/schnell",
         "flux-pro" | "fal-ai/flux-pro/v1.1" => "fal-ai/flux-pro/v1.1",
         "flux-ultra" | "fal-ai/flux-pro/v1.1-ultra" => "fal-ai/flux-pro/v1.1-ultra",
         "recraft" | "fal-ai/recraft-v3" => "fal-ai/recraft-v3",
-        "z-image" | "fal-ai/z-image/turbo" => "fal-ai/z-image/turbo",
+        // Z-Image: route to image-to-image endpoint when reference provided
+        "z-image" | "fal-ai/z-image/turbo" | "fal-ai/z-image/turbo/image-to-image" => {
+            if has_reference {
+                "fal-ai/z-image/turbo/image-to-image"
+            } else {
+                "fal-ai/z-image/turbo"
+            }
+        }
         _ => model,
     }
 }
@@ -27,6 +43,10 @@ struct FalRequest {
     image_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     image_size: Option<String>,
+    /// Strength for image-to-image (0.0-1.0, default 0.6)
+    /// Higher = more influence from prompt, lower = more from reference
+    #[serde(skip_serializing_if = "Option::is_none")]
+    strength: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -52,9 +72,10 @@ pub async fn generate(
     reference_paths: &[String],
 ) -> Result<GenerationResult> {
     let api_key = get_api_key()?;
-    let model_id = resolve_model(model);
+    let has_reference = !reference_paths.is_empty();
+    let model_id = resolve_model(model, has_reference);
 
-    // Build image_url from reference if provided
+    // Build image_url from reference if provided (max 1 for Z-Image)
     let image_url = if let Some(ref_path) = reference_paths.first() {
         let path = Path::new(ref_path);
         let data = std::fs::read(path).context("Failed to read reference image")?;
@@ -65,10 +86,18 @@ pub async fn generate(
         None
     };
 
+    // Set strength for image-to-image models (0.6 default balances prompt vs reference)
+    let strength = if has_reference && model_id.contains("image-to-image") {
+        Some(0.6)
+    } else {
+        None
+    };
+
     let request = FalRequest {
         prompt: prompt.to_string(),
         image_url,
         image_size: Some("square_hd".to_string()),
+        strength,
     };
 
     let url = format!("{}/{}", API_BASE, model_id);

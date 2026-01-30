@@ -91,16 +91,32 @@ Model ID Mapping
 
 User-facing model names differ from API model IDs. This is intentional for usability.
 
-| User Model | API Model ID | Provider |
-|------------|--------------|----------|
-| `gemini-flash` | `gemini-2.5-flash-image` | Gemini |
-| `gemini-pro` | `gemini-3-pro-image-preview` | Gemini |
-| `fal-ai/flux/schnell` | (same) | fal.ai |
-| `fal-ai/flux-pro/v1.1` | (same) | fal.ai |
-| `dall-e-3` | (same) | OpenAI |
-| `gpt-image-1` | (same) | OpenAI |
+| User Model | API Model ID | Provider | Cost |
+|------------|--------------|----------|------|
+| `gemini-flash` | `gemini-2.5-flash-image` | Gemini | ~$0.039 |
+| `gemini-pro` | `gemini-3-pro-image-preview` | Gemini | ~$0.134 |
+| `fal-ai/flux/schnell` | (same) | fal.ai | $0.003 |
+| `fal-ai/flux-pro/v1.1` | (same) | fal.ai | $0.05 |
+| `fal-ai/z-image/turbo` | (same) or `/image-to-image` | fal.ai | $0.005/MP |
+| `dall-e-3` | (same) | OpenAI | $0.04 |
+| `gpt-image-1` | (same) | OpenAI | $0.02 |
 
 The mapping lives in each provider's `resolve_model()` function. When Gemini/OpenAI rename models (which happens), update there.
+
+### Z-Image Turbo Details
+
+Z-Image Turbo is a 6B parameter model from Tongyi-MAI. Only the Turbo variant is publicly available (no "Z-Image base").
+
+- **Text-to-image**: `fal-ai/z-image/turbo` - $0.005/MP
+- **Image-to-image**: `fal-ai/z-image/turbo/image-to-image` - $0.005/MP (auto-routed when ref provided)
+- **With LoRA**: `fal-ai/z-image/turbo/lora` - $0.0085/MP (not implemented)
+
+Parameters:
+- `strength` (image-to-image only): 0.0-1.0, default 0.6. Higher = more prompt influence, lower = more reference influence
+- `num_images`: 1-4
+- `num_inference_steps`: 1-8 (default 8)
+- `image_size`: square, square_hd, portrait_4_3, portrait_16_9, landscape_4_3, landscape_16_9
+- **Max 1 reference image** for image-to-image
 
 Non-Obvious Details
 ----------

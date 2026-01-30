@@ -55,13 +55,15 @@ export function Gallery({ generations, selectedId, onSelect, onContextMenu, load
       ))}
       <style>{`
         .gallery {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(160px, 200px));
-          justify-content: center;
-          gap: var(--spacing-md);
+          column-width: 180px;
+          column-gap: var(--spacing-md);
           padding: var(--spacing-md);
           overflow-y: auto;
           flex: 1;
+        }
+        .gallery > div {
+          break-inside: avoid;
+          margin-bottom: var(--spacing-md);
         }
       `}</style>
     </div>

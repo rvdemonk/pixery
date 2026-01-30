@@ -82,6 +82,15 @@ impl ModelInfo {
                 display_name: "Recraft V3".into(),
                 cost_per_image: 0.04,
             },
+            // Z-Image Turbo: $0.005/MP, ~$0.005 for 1MP (1024x1024)
+            // Only Turbo variant publicly available. Routes to image-to-image endpoint when ref provided.
+            // Max 1 reference image. Params: strength (0-1), num_inference_steps (1-8)
+            ModelInfo {
+                id: "fal-ai/z-image/turbo".into(),
+                provider: Provider::Fal,
+                display_name: "Z-Image Turbo".into(),
+                cost_per_image: 0.005,
+            },
             // OpenAI models
             ModelInfo {
                 id: "dall-e-3".into(),

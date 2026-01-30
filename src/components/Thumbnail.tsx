@@ -27,26 +27,22 @@ export function Thumbnail({ generation, selected, onClick, onContextMenu }: Thum
       <style>{`
         .thumbnail {
           position: relative;
-          aspect-ratio: 1;
           border-radius: var(--radius-md);
           overflow: hidden;
           cursor: pointer;
           border: 2px solid transparent;
           transition: all var(--transition-fast);
-          background: var(--bg-elevated);
         }
         .thumbnail:hover {
           border-color: var(--border-light);
-          transform: translateY(-2px);
-          box-shadow: var(--shadow-md);
         }
         .thumbnail-selected {
           border-color: var(--accent);
         }
         .thumbnail img {
+          display: block;
           width: 100%;
-          height: 100%;
-          object-fit: cover;
+          height: auto;
         }
         .thumbnail-star {
           position: absolute;
