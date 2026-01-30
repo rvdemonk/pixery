@@ -18,6 +18,7 @@ export interface Generation {
   starred: boolean;
   created_at: string;
   trashed_at: string | null;
+  title: string | null;
   tags: string[];
 }
 

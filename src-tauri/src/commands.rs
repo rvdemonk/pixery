@@ -153,6 +153,12 @@ pub fn update_prompt(state: State<'_, AppState>, id: i64, prompt: String) -> Res
 }
 
 #[tauri::command]
+pub fn update_title(state: State<'_, AppState>, id: i64, title: Option<String>) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.update_title(id, title.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn add_tags(state: State<'_, AppState>, id: i64, tags: Vec<String>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.add_tags(id, &tags).map_err(|e| e.to_string())

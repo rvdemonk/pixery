@@ -32,6 +32,7 @@ pub fn run() {
             commands::restore_generation,
             commands::permanently_delete_generation,
             commands::update_prompt,
+            commands::update_title,
             commands::add_tags,
             commands::remove_tag,
             commands::list_tags,

@@ -44,6 +44,10 @@ export async function updatePrompt(id: number, prompt: string): Promise<void> {
   return invoke('update_prompt', { id, prompt });
 }
 
+export async function updateTitle(id: number, title: string | null): Promise<void> {
+  return invoke('update_title', { id, title });
+}
+
 export async function addTags(id: number, tags: string[]): Promise<void> {
   return invoke('add_tags', { id, tags });
 }

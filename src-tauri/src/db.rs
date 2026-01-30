@@ -88,6 +88,12 @@ impl Database {
             [],
         );
 
+        // Add title column if it doesn't exist (migration for existing DBs)
+        let _ = self.conn.execute(
+            "ALTER TABLE generations ADD COLUMN title TEXT",
+            [],
+        );
+
         Ok(())
     }
 
@@ -121,7 +127,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT id, slug, prompt, model, provider, timestamp, date, image_path, thumb_path,
                     generation_time_seconds, cost_estimate_usd, seed, width, height, file_size,
-                    parent_id, starred, created_at, trashed_at
+                    parent_id, starred, created_at, trashed_at, title
              FROM generations WHERE id = ?1",
         )?;
 
@@ -147,6 +153,7 @@ impl Database {
                     starred: row.get::<_, i32>(16)? != 0,
                     created_at: row.get(17)?,
                     trashed_at: row.get(18)?,
+                    title: row.get(19)?,
                     tags: vec![],
                 })
             })
@@ -164,7 +171,7 @@ impl Database {
         let mut sql = String::from(
             "SELECT DISTINCT g.id, g.slug, g.prompt, g.model, g.provider, g.timestamp, g.date,
                     g.image_path, g.thumb_path, g.generation_time_seconds, g.cost_estimate_usd,
-                    g.seed, g.width, g.height, g.file_size, g.parent_id, g.starred, g.created_at, g.trashed_at
+                    g.seed, g.width, g.height, g.file_size, g.parent_id, g.starred, g.created_at, g.trashed_at, g.title
              FROM generations g",
         );
 
@@ -241,6 +248,7 @@ impl Database {
                 starred: row.get::<_, i32>(16)? != 0,
                 created_at: row.get(17)?,
                 trashed_at: row.get(18)?,
+                title: row.get(19)?,
                 tags: vec![],
             })
         })?;
@@ -315,6 +323,14 @@ impl Database {
         self.conn.execute(
             "UPDATE generations SET prompt = ?1 WHERE id = ?2",
             params![prompt, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_title(&self, id: i64, title: Option<&str>) -> Result<()> {
+        self.conn.execute(
+            "UPDATE generations SET title = ?1 WHERE id = ?2",
+            params![title, id],
         )?;
         Ok(())
     }
