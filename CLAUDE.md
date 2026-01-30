@@ -6,7 +6,7 @@ Unified image generation tool with CLI and GUI interfaces. Single Rust binary se
 **Location:** `~/tools/pixery/`
 **Binary:** `~/.local/bin/pixery` → `~/tools/pixery/src-tauri/target/release/pixery`
 **Archive:** `~/media/image-gen/`
-**Skill:** `~/.claude/commands/imagen.md` (TODO: rename to pixery.md)
+**Skill:** `~/.claude/commands/pixery.md`
 **Repo:** https://github.com/rvdemonk/pixery
 
 See `docs/BACKLOG.md` for current priorities and `docs/CHANGELOG.md` for release history.

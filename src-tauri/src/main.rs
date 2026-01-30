@@ -1,10 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use clap::Parser;
-use imagen_lib::cli;
+use pixery_lib::cli;
 
 #[derive(Parser)]
-#[command(name = "imagen")]
+#[command(name = "pixery")]
 #[command(about = "Unified image generation tool")]
 struct Args {
     #[command(subcommand)]
@@ -24,7 +24,7 @@ fn main() {
         }
         None => {
             // GUI mode
-            imagen_lib::run()
+            pixery_lib::run()
         }
     }
 }
