@@ -28,8 +28,16 @@ export async function toggleStarred(id: number): Promise<boolean> {
   return invoke('toggle_starred', { id });
 }
 
-export async function deleteGeneration(id: number): Promise<boolean> {
-  return invoke('delete_generation', { id });
+export async function trashGeneration(id: number): Promise<boolean> {
+  return invoke('trash_generation', { id });
+}
+
+export async function restoreGeneration(id: number): Promise<boolean> {
+  return invoke('restore_generation', { id });
+}
+
+export async function permanentlyDeleteGeneration(id: number): Promise<boolean> {
+  return invoke('permanently_delete_generation', { id });
 }
 
 export async function updatePrompt(id: number, prompt: string): Promise<void> {

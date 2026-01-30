@@ -128,6 +128,7 @@ pub struct Generation {
     pub parent_id: Option<i64>,
     pub starred: bool,
     pub created_at: String,
+    pub trashed_at: Option<String>,
     pub tags: Vec<String>,
 }
 

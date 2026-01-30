@@ -17,6 +17,7 @@ export interface Generation {
   parent_id: number | null;
   starred: boolean;
   created_at: string;
+  trashed_at: string | null;
   tags: string[];
 }
 

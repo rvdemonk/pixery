@@ -6,11 +6,10 @@ interface GalleryProps {
   generations: Generation[];
   selectedId: number | null;
   onSelect: (id: number) => void;
-  onOpen: (id: number) => void;
   loading: boolean;
 }
 
-export function Gallery({ generations, selectedId, onSelect, onOpen, loading }: GalleryProps) {
+export function Gallery({ generations, selectedId, onSelect, loading }: GalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Scroll selected item into view
@@ -46,14 +45,14 @@ export function Gallery({ generations, selectedId, onSelect, onOpen, loading }: 
             generation={gen}
             selected={gen.id === selectedId}
             onClick={() => onSelect(gen.id)}
-            onDoubleClick={() => onOpen(gen.id)}
           />
         </div>
       ))}
       <style>{`
         .gallery {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(160px, 200px));
+          justify-content: center;
           gap: var(--spacing-md);
           padding: var(--spacing-md);
           overflow-y: auto;

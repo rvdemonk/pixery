@@ -30,4 +30,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Version numbers 
 - Starred/favorite system for images
 - Keyboard navigation (vim-style j/k, arrow keys)
 
+### Added
+- Markdown rendering for prompts in details panel (headers, lists, code, emphasis)
+- `pixery regen-thumbs` CLI command to regenerate existing thumbnails
+- Trash feature: images are soft-deleted instead of permanently removed
+- Confirmation dialog before trashing (replaces browser confirm)
+
+### Changed
+- Single-click on thumbnail now opens details panel (was double-click)
+- Thumbnail size increased from 200px to 400px for Retina display sharpness
+- Gallery grid now caps thumbnail display at 200px (was unbounded)
+- Delete button renamed to "Trash" with modal confirmation
+- Gallery thumbnails now centered (was left-aligned with gap on right)
+
+### Fixed
+- Unified column headers across sidebar, gallery, and details panel (consistent 56px height)
+- Renamed leftover "imagen" branding to "pixery" in sidebar
+
 ---

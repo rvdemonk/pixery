@@ -103,6 +103,32 @@ pub enum Commands {
         id: i64,
     },
 
+    /// Update a generation's metadata
+    Update {
+        /// Generation ID
+        id: i64,
+
+        /// New prompt text
+        #[arg(short, long)]
+        prompt: Option<String>,
+
+        /// Read new prompt from file
+        #[arg(long = "prompt-file")]
+        prompt_file: Option<PathBuf>,
+
+        /// Update model
+        #[arg(short, long)]
+        model: Option<String>,
+
+        /// Add reference image(s)
+        #[arg(short, long = "ref")]
+        reference: Vec<PathBuf>,
+
+        /// Add tags (comma-separated)
+        #[arg(short, long)]
+        tags: Option<String>,
+    },
+
     /// List available models
     Models,
 
@@ -149,6 +175,17 @@ pub enum Commands {
         /// Override timestamp (HH:MM:SS), otherwise extracted from filename or uses now
         #[arg(long)]
         time: Option<String>,
+    },
+
+    /// Regenerate all thumbnails at current size (400px)
+    RegenThumbs {
+        /// Only process thumbnails smaller than this size (default: regenerate all)
+        #[arg(long)]
+        if_smaller: Option<u32>,
+
+        /// Dry run - show what would be regenerated without doing it
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -245,6 +282,16 @@ pub fn run(cmd: Commands) -> Result<()> {
             if !gen.tags.is_empty() {
                 println!("Tags: {}", gen.tags.join(", "));
             }
+
+            // Show reference images
+            let refs = db.get_references_for_generation(id)?;
+            if !refs.is_empty() {
+                println!("References ({}):", refs.len());
+                for r in &refs {
+                    println!("  - {}", r.path);
+                }
+            }
+
             println!("\nPrompt:\n{}", gen.prompt);
         }
 
@@ -269,11 +316,70 @@ pub fn run(cmd: Commands) -> Result<()> {
         }
 
         Commands::Delete { id } => {
-            if let Some(path) = db.delete_generation(id)? {
+            if let Some(path) = db.permanently_delete_generation(id)? {
                 archive::delete_image(std::path::Path::new(&path))?;
                 println!("Deleted generation {}", id);
             } else {
                 println!("Generation {} not found", id);
+            }
+        }
+
+        Commands::Update {
+            id,
+            prompt,
+            prompt_file,
+            model,
+            reference,
+            tags,
+        } => {
+            // Verify generation exists
+            db.get_generation(id)?
+                .ok_or_else(|| anyhow::anyhow!("Generation {} not found", id))?;
+
+            let mut updates = vec![];
+
+            // Update prompt
+            if let Some(p) = prompt {
+                db.update_prompt(id, &p)?;
+                updates.push("prompt");
+            } else if let Some(f) = prompt_file {
+                let p = std::fs::read_to_string(&f).context("Failed to read prompt file")?;
+                db.update_prompt(id, &p)?;
+                updates.push("prompt");
+            }
+
+            // Update model
+            if let Some(m) = model {
+                let model_info = ModelInfo::find(&m);
+                let provider = model_info
+                    .as_ref()
+                    .map(|mi| mi.provider.to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+                db.update_model(id, &m, &provider)?;
+                updates.push("model");
+            }
+
+            // Add tags
+            if let Some(t) = tags {
+                let tag_list: Vec<String> = t.split(',').map(|s| s.trim().to_string()).collect();
+                db.add_tags(id, &tag_list)?;
+                updates.push("tags");
+            }
+
+            // Add reference images
+            if !reference.is_empty() {
+                for ref_path in &reference {
+                    let (hash, stored_path) = archive::store_reference(ref_path)?;
+                    let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap())?;
+                    db.link_reference(id, ref_id)?;
+                }
+                updates.push("references");
+            }
+
+            if updates.is_empty() {
+                println!("No updates specified for generation {}", id);
+            } else {
+                println!("Updated generation {}: {}", id, updates.join(", "));
             }
         }
 
@@ -360,6 +466,10 @@ pub fn run(cmd: Commands) -> Result<()> {
                 .collect();
 
             import_image(&db, &file, &prompt_text, &model, &tag_list, &ref_paths, date.as_deref(), time.as_deref())?;
+        }
+
+        Commands::RegenThumbs { if_smaller, dry_run } => {
+            regenerate_thumbnails(&db, if_smaller, dry_run)?;
         }
     }
 
@@ -608,4 +718,97 @@ fn parse_since(since: &str) -> Result<Option<String>> {
     }
 
     anyhow::bail!("Invalid since format. Use '7d', '2w', or 'YYYY-MM-DD'");
+}
+
+fn regenerate_thumbnails(db: &Database, if_smaller: Option<u32>, dry_run: bool) -> Result<()> {
+    use image::GenericImageView;
+
+    let filter = ListFilter {
+        limit: None,
+        ..Default::default()
+    };
+    let generations = db.list_generations(&filter)?;
+
+    let target_size = archive::THUMBNAIL_SIZE;
+    let mut regenerated = 0;
+    let mut skipped = 0;
+    let mut errors = 0;
+
+    println!(
+        "Regenerating thumbnails at {}px{}",
+        target_size,
+        if dry_run { " (dry run)" } else { "" }
+    );
+    println!();
+
+    for gen in &generations {
+        let image_path = std::path::Path::new(&gen.image_path);
+
+        // Check if source image exists
+        if !image_path.exists() {
+            println!("  [SKIP] ID {}: source image missing", gen.id);
+            skipped += 1;
+            continue;
+        }
+
+        // Determine thumb path
+        let stem = image_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("image");
+        let thumb_path = image_path.with_file_name(format!("{}.thumb.jpg", stem));
+
+        // Check if we should regenerate based on --if-smaller
+        if let Some(min_size) = if_smaller {
+            if thumb_path.exists() {
+                if let Ok(existing) = image::open(&thumb_path) {
+                    let (w, h) = existing.dimensions();
+                    if w >= min_size && h >= min_size {
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        if dry_run {
+            println!("  [REGEN] ID {}: {}", gen.id, gen.slug);
+            regenerated += 1;
+            continue;
+        }
+
+        // Load source and generate new thumbnail
+        match image::open(image_path) {
+            Ok(img) => {
+                let thumb = img.thumbnail(target_size, target_size);
+                match thumb.save(&thumb_path) {
+                    Ok(_) => {
+                        println!("  [OK] ID {}: {}", gen.id, gen.slug);
+                        regenerated += 1;
+
+                        // Update database if thumb_path changed
+                        if gen.thumb_path.as_deref() != Some(thumb_path.to_str().unwrap_or("")) {
+                            let _ = db.update_thumb_path(gen.id, thumb_path.to_str().unwrap());
+                        }
+                    }
+                    Err(e) => {
+                        println!("  [ERR] ID {}: failed to save - {}", gen.id, e);
+                        errors += 1;
+                    }
+                }
+            }
+            Err(e) => {
+                println!("  [ERR] ID {}: failed to load - {}", gen.id, e);
+                errors += 1;
+            }
+        }
+    }
+
+    println!();
+    println!(
+        "Done: {} regenerated, {} skipped, {} errors",
+        regenerated, skipped, errors
+    );
+
+    Ok(())
 }

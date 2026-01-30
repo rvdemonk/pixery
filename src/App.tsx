@@ -129,10 +129,9 @@ export default function App() {
     }
   }, [selectedGeneration, generate, refresh, refreshTags]);
 
-  const handleDelete = useCallback(async () => {
+  const handleTrash = useCallback(async () => {
     if (!selectedId) return;
-    if (!confirm('Delete this generation?')) return;
-    await api.deleteGeneration(selectedId);
+    await api.trashGeneration(selectedId);
     setSelectedId(null);
     setDetailsOpen(false);
     refresh();
@@ -190,7 +189,7 @@ export default function App() {
         setSelectedId(null);
       }
     },
-    onDelete: handleDelete,
+    onDelete: handleTrash,
   }, view === 'gallery' || showHelp);
 
   return (
@@ -205,7 +204,7 @@ export default function App() {
       />
 
       <main className="main-content">
-        <header className="main-header">
+        <header className="column-header main-header">
           <div className="search-bar">
             <input
               id="search-input"
@@ -236,8 +235,7 @@ export default function App() {
         <Gallery
           generations={generations}
           selectedId={selectedId}
-          onSelect={setSelectedId}
-          onOpen={(id) => {
+          onSelect={(id) => {
             setSelectedId(id);
             setDetailsOpen(true);
           }}
@@ -255,7 +253,7 @@ export default function App() {
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onRegenerate={handleRegenerate}
-          onDelete={handleDelete}
+          onTrash={handleTrash}
         />
       )}
 
@@ -280,12 +278,7 @@ export default function App() {
 
       <style>{`
         .main-header {
-          display: flex;
-          align-items: center;
           gap: var(--spacing-md);
-          padding: var(--spacing-md);
-          border-bottom: 1px solid var(--border);
-          background: var(--bg-secondary);
         }
         .search-bar {
           flex: 1;

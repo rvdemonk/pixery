@@ -124,9 +124,21 @@ pub fn toggle_starred(state: State<'_, AppState>, id: i64) -> Result<bool, Strin
 }
 
 #[tauri::command]
-pub fn delete_generation(state: State<'_, AppState>, id: i64) -> Result<bool, String> {
+pub fn trash_generation(state: State<'_, AppState>, id: i64) -> Result<bool, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    if let Some(path) = db.delete_generation(id).map_err(|e| e.to_string())? {
+    db.trash_generation(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn restore_generation(state: State<'_, AppState>, id: i64) -> Result<bool, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.restore_generation(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn permanently_delete_generation(state: State<'_, AppState>, id: i64) -> Result<bool, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    if let Some(path) = db.permanently_delete_generation(id).map_err(|e| e.to_string())? {
         archive::delete_image(std::path::Path::new(&path)).map_err(|e| e.to_string())?;
         Ok(true)
     } else {

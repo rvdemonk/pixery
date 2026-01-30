@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Markdown from 'react-markdown';
 import type { Generation, ModelInfo } from '../lib/types';
 import { getImageUrl } from '../lib/api';
 import { TagChips } from './TagChips';
@@ -12,7 +13,7 @@ interface DetailsProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onRegenerate: (model: string) => void;
-  onDelete: () => void;
+  onTrash: () => void;
 }
 
 export function Details({
@@ -24,17 +25,19 @@ export function Details({
   onAddTag,
   onRemoveTag,
   onRegenerate,
-  onDelete,
+  onTrash,
 }: DetailsProps) {
   const [editingPrompt, setEditingPrompt] = useState(false);
   const [promptValue, setPromptValue] = useState(generation.prompt);
   const [selectedModel, setSelectedModel] = useState(generation.model);
+  const [showTrashConfirm, setShowTrashConfirm] = useState(false);
 
   // Sync local state when selected generation changes
   useEffect(() => {
     setPromptValue(generation.prompt);
     setSelectedModel(generation.model);
     setEditingPrompt(false);
+    setShowTrashConfirm(false);
   }, [generation.id]);
 
   const handlePromptSave = () => {
@@ -53,7 +56,7 @@ export function Details({
 
   return (
     <div className="panel details-panel">
-      <div className="details-header">
+      <div className="column-header details-header">
         <h2>Details</h2>
         <button className="btn btn-ghost btn-sm" onClick={onClose}>×</button>
       </div>
@@ -134,9 +137,9 @@ export function Details({
               </div>
             </div>
           ) : (
-            <p className="prompt-text" onClick={() => setEditingPrompt(true)}>
-              {generation.prompt}
-            </p>
+            <div className="prompt-text" onClick={() => setEditingPrompt(true)}>
+              <Markdown>{generation.prompt}</Markdown>
+            </div>
           )}
         </div>
 
@@ -169,11 +172,34 @@ export function Details({
           >
             {generation.starred ? '★ Starred' : '☆ Star'}
           </button>
-          <button className="btn btn-secondary btn-danger" onClick={onDelete}>
-            Delete
+          <button className="btn btn-secondary btn-danger" onClick={() => setShowTrashConfirm(true)}>
+            Trash
           </button>
         </div>
       </div>
+
+      {showTrashConfirm && (
+        <div className="confirm-overlay" onClick={() => setShowTrashConfirm(false)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Move to Trash?</h3>
+            <p>This image will be moved to trash. You can restore it later.</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={() => setShowTrashConfirm(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => {
+                  setShowTrashConfirm(false);
+                  onTrash();
+                }}
+              >
+                Move to Trash
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .details-panel {
@@ -181,14 +207,7 @@ export function Details({
           flex-direction: column;
         }
         .details-header {
-          display: flex;
           justify-content: space-between;
-          align-items: center;
-          padding: var(--spacing-md);
-          border-bottom: 1px solid var(--border);
-        }
-        .details-header h2 {
-          font-size: 16px;
         }
         .details-image {
           padding: var(--spacing-md);
@@ -238,6 +257,45 @@ export function Details({
         .prompt-text:hover {
           background: var(--bg-hover);
         }
+        .prompt-text p {
+          margin-bottom: var(--spacing-sm);
+        }
+        .prompt-text p:last-child {
+          margin-bottom: 0;
+        }
+        .prompt-text h1, .prompt-text h2, .prompt-text h3 {
+          font-size: 14px;
+          font-weight: 600;
+          margin-bottom: var(--spacing-xs);
+        }
+        .prompt-text ul, .prompt-text ol {
+          margin-left: var(--spacing-md);
+          margin-bottom: var(--spacing-sm);
+        }
+        .prompt-text code {
+          background: var(--bg-elevated);
+          padding: 1px 4px;
+          border-radius: var(--radius-sm);
+          font-family: var(--font-mono);
+          font-size: 12px;
+        }
+        .prompt-text pre {
+          background: var(--bg-elevated);
+          padding: var(--spacing-sm);
+          border-radius: var(--radius-sm);
+          overflow-x: auto;
+          margin-bottom: var(--spacing-sm);
+        }
+        .prompt-text pre code {
+          background: none;
+          padding: 0;
+        }
+        .prompt-text strong {
+          font-weight: 600;
+        }
+        .prompt-text em {
+          font-style: italic;
+        }
         .prompt-edit textarea {
           width: 100%;
           margin-bottom: var(--spacing-sm);
@@ -270,6 +328,45 @@ export function Details({
         }
         .starred {
           color: var(--warning);
+        }
+        .confirm-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+        .confirm-dialog {
+          background: var(--bg-secondary);
+          padding: var(--spacing-lg);
+          border-radius: var(--radius-lg);
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .confirm-dialog h3 {
+          margin: 0 0 var(--spacing-sm) 0;
+          font-size: 18px;
+        }
+        .confirm-dialog p {
+          color: var(--text-secondary);
+          margin: 0 0 var(--spacing-lg) 0;
+        }
+        .confirm-actions {
+          display: flex;
+          gap: var(--spacing-sm);
+          justify-content: flex-end;
+        }
+        .btn-danger {
+          background: var(--error);
+          border-color: var(--error);
+          color: white;
+        }
+        .btn-danger:hover {
+          background: #c0392b;
+          border-color: #c0392b;
         }
       `}</style>
     </div>

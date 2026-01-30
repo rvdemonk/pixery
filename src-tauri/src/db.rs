@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS generations (
     file_size INTEGER,
     parent_id INTEGER REFERENCES generations(id),
     starred INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    trashed_at TEXT
 );
 
 -- Tags system
@@ -80,6 +81,13 @@ impl Database {
         self.conn
             .execute_batch(SCHEMA)
             .context("Failed to run migrations")?;
+
+        // Add trashed_at column if it doesn't exist (migration for existing DBs)
+        let _ = self.conn.execute(
+            "ALTER TABLE generations ADD COLUMN trashed_at TEXT",
+            [],
+        );
+
         Ok(())
     }
 
@@ -113,7 +121,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT id, slug, prompt, model, provider, timestamp, date, image_path, thumb_path,
                     generation_time_seconds, cost_estimate_usd, seed, width, height, file_size,
-                    parent_id, starred, created_at
+                    parent_id, starred, created_at, trashed_at
              FROM generations WHERE id = ?1",
         )?;
 
@@ -138,6 +146,7 @@ impl Database {
                     parent_id: row.get(15)?,
                     starred: row.get::<_, i32>(16)? != 0,
                     created_at: row.get(17)?,
+                    trashed_at: row.get(18)?,
                     tags: vec![],
                 })
             })
@@ -155,7 +164,7 @@ impl Database {
         let mut sql = String::from(
             "SELECT DISTINCT g.id, g.slug, g.prompt, g.model, g.provider, g.timestamp, g.date,
                     g.image_path, g.thumb_path, g.generation_time_seconds, g.cost_estimate_usd,
-                    g.seed, g.width, g.height, g.file_size, g.parent_id, g.starred, g.created_at
+                    g.seed, g.width, g.height, g.file_size, g.parent_id, g.starred, g.created_at, g.trashed_at
              FROM generations g",
         );
 
@@ -165,6 +174,9 @@ impl Database {
         if filter.tag.is_some() {
             sql.push_str(" JOIN generation_tags gt ON g.id = gt.generation_id JOIN tags t ON gt.tag_id = t.id");
         }
+
+        // Exclude trashed items by default
+        conditions.push("g.trashed_at IS NULL");
 
         if let Some(ref tag) = filter.tag {
             conditions.push("t.name = ?");
@@ -228,6 +240,7 @@ impl Database {
                 parent_id: row.get(15)?,
                 starred: row.get::<_, i32>(16)? != 0,
                 created_at: row.get(17)?,
+                trashed_at: row.get(18)?,
                 tags: vec![],
             })
         })?;
@@ -265,7 +278,24 @@ impl Database {
         Ok(starred != 0)
     }
 
-    pub fn delete_generation(&self, id: i64) -> Result<Option<String>> {
+    pub fn trash_generation(&self, id: i64) -> Result<bool> {
+        let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+        let rows = self.conn.execute(
+            "UPDATE generations SET trashed_at = ?1 WHERE id = ?2 AND trashed_at IS NULL",
+            params![now, id],
+        )?;
+        Ok(rows > 0)
+    }
+
+    pub fn restore_generation(&self, id: i64) -> Result<bool> {
+        let rows = self.conn.execute(
+            "UPDATE generations SET trashed_at = NULL WHERE id = ?1 AND trashed_at IS NOT NULL",
+            params![id],
+        )?;
+        Ok(rows > 0)
+    }
+
+    pub fn permanently_delete_generation(&self, id: i64) -> Result<Option<String>> {
         let path: Option<String> = self
             .conn
             .query_row(
@@ -285,6 +315,22 @@ impl Database {
         self.conn.execute(
             "UPDATE generations SET prompt = ?1 WHERE id = ?2",
             params![prompt, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_model(&self, id: i64, model: &str, provider: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE generations SET model = ?1, provider = ?2 WHERE id = ?3",
+            params![model, provider, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_thumb_path(&self, id: i64, thumb_path: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE generations SET thumb_path = ?1 WHERE id = ?2",
+            params![thumb_path, id],
         )?;
         Ok(())
     }
@@ -408,6 +454,30 @@ impl Database {
             )
             .optional()
             .context("Failed to query reference")
+    }
+
+    pub fn get_references_for_generation(&self, generation_id: i64) -> Result<Vec<Reference>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT r.id, r.hash, r.path, r.created_at
+             FROM refs r
+             JOIN generation_refs gr ON r.id = gr.ref_id
+             WHERE gr.generation_id = ?1",
+        )?;
+
+        let rows = stmt.query_map(params![generation_id], |row| {
+            Ok(Reference {
+                id: row.get(0)?,
+                hash: row.get(1)?,
+                path: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+
+        let mut refs = vec![];
+        for row in rows {
+            refs.push(row?);
+        }
+        Ok(refs)
     }
 
     // Cost tracking
