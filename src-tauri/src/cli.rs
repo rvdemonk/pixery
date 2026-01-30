@@ -108,6 +108,10 @@ pub enum Commands {
         /// Generation ID
         id: i64,
 
+        /// New title
+        #[arg(long)]
+        title: Option<String>,
+
         /// New prompt text
         #[arg(short, long)]
         prompt: Option<String>,
@@ -326,6 +330,7 @@ pub fn run(cmd: Commands) -> Result<()> {
 
         Commands::Update {
             id,
+            title,
             prompt,
             prompt_file,
             model,
@@ -337,6 +342,12 @@ pub fn run(cmd: Commands) -> Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("Generation {} not found", id))?;
 
             let mut updates = vec![];
+
+            // Update title
+            if let Some(t) = title {
+                db.update_title(id, Some(&t))?;
+                updates.push("title");
+            }
 
             // Update prompt
             if let Some(p) = prompt {
