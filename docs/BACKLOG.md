@@ -29,10 +29,6 @@ Items currently being worked on.
 
 High priority items to tackle next.
 
-- [ ] `#ux` Generation progress feedback system - show feedback when image generation is in progress; design as general API usable from multiple entry points (GUI regenerate button, CLI backend when Claude triggers generation); suggested: indicator in top banner showing count of pending generations, hoverable for details (time since request, model, prompt preview); should work for both GUI-initiated and CLI-initiated generations
-
-- [ ] `#feature` CLI image preview for Claude - add command to output images at configurable resolutions (e.g. `pixery preview <id> --width 800`); helps Claude review generations without clogging context; need to find optimal resolution for detail vs token efficiency
-
 - [ ] `#ux` Details close button - make X button larger, follow best practices for dismiss targets
 
 - [ ] `#ux` Shared close button component - create reusable X button for all closeable elements (cost dashboard, popups, detail column)
@@ -84,6 +80,8 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] CLI image preview for Claude (`pixery view <ids>... [--width] [--height]`) - outputs resized images to `/tmp/pixery-preview/` for agent viewing
+- [x] Generation progress feedback system (jobs table, header indicator)
 - [x] Settings modal with hidden tags (cog icon in header, localStorage persistence)
 - [x] Sidebar overlay mode (hover = overlay, click = pin to shift gallery)
 - [x] Gallery auto-refreshes on new generations (FSEvents watcher fixed)

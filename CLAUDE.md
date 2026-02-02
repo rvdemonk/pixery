@@ -171,6 +171,8 @@ Anti-Patterns
 
 **DO NOT** commit API keys - they live in `~/.env`, not in the repo.
 
+**DO NOT** use `cargo build --release` for release builds - use `npm run tauri build` to produce the proper bundled binary. `cargo check` or `cargo build` in `src-tauri/` is fine for quick compile verification during development, but the release binary at `~/.local/bin/pixery` only updates via the full Tauri build.
+
 GUI Keyboard Shortcuts
 ----------
 

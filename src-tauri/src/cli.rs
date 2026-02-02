@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use chrono::{Duration, Local, NaiveDate};
 use clap::Subcommand;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::archive;
 use crate::db::Database;
@@ -71,6 +71,30 @@ pub enum Commands {
     Show {
         /// Generation ID
         id: i64,
+    },
+
+    /// Output image paths for agent viewing
+    #[command(long_about = "Output image paths for agent viewing.\n\n\
+        Without resize options, prints original file paths.\n\
+        With --width and/or --height, resizes images (preserving aspect ratio) \
+        and writes to /tmp/pixery-preview/, printing the output paths.\n\n\
+        Designed for Claude to view generations: pipe IDs from 'pixery list' or 'pixery search', \
+        then read the output paths.\n\n\
+        Examples:\n  \
+        pixery view 140                    # Original path\n  \
+        pixery view 140 --width 800        # Resized to 800px wide\n  \
+        pixery view 140 141 142 -w 600     # Multiple images")]
+    View {
+        /// Generation IDs to view
+        ids: Vec<i64>,
+
+        /// Resize width in pixels (preserves aspect ratio)
+        #[arg(short, long)]
+        width: Option<u32>,
+
+        /// Resize height in pixels (preserves aspect ratio)
+        #[arg(short = 'H', long)]
+        height: Option<u32>,
     },
 
     /// Add tags to a generation
@@ -297,6 +321,10 @@ pub fn run(cmd: Commands) -> Result<()> {
             }
 
             println!("\nPrompt:\n{}", gen.prompt);
+        }
+
+        Commands::View { ids, width, height } => {
+            view_images(&db, &ids, width, height)?;
         }
 
         Commands::Tag { id, tags } => {
@@ -841,6 +869,71 @@ fn regenerate_thumbnails(db: &Database, if_smaller: Option<u32>, dry_run: bool) 
         "Done: {} regenerated, {} skipped, {} errors",
         regenerated, skipped, errors
     );
+
+    Ok(())
+}
+
+/// Output images to temp directory for agent viewing
+fn view_images(db: &Database, ids: &[i64], width: Option<u32>, height: Option<u32>) -> Result<()> {
+    use image::GenericImageView;
+
+    let output_dir = PathBuf::from("/tmp/pixery-preview");
+    std::fs::create_dir_all(&output_dir).context("Failed to create preview directory")?;
+
+    for id in ids {
+        let gen = match db.get_generation(*id)? {
+            Some(g) => g,
+            None => {
+                eprintln!("Generation {} not found", id);
+                continue;
+            }
+        };
+
+        let source_path = Path::new(&gen.image_path);
+        if !source_path.exists() {
+            eprintln!("Image file missing for generation {}", id);
+            continue;
+        }
+
+        // Load the image
+        let img = image::open(source_path)
+            .with_context(|| format!("Failed to load image for generation {}", id))?;
+
+        let (orig_w, orig_h) = img.dimensions();
+
+        // Determine output dimensions
+        let output_img = match (width, height) {
+            (None, None) => {
+                // No resize - just output the path to the original
+                println!("{}", gen.image_path);
+                continue;
+            }
+            (Some(w), None) => {
+                // Scale by width, preserve aspect ratio
+                let scale = w as f32 / orig_w as f32;
+                let new_h = (orig_h as f32 * scale) as u32;
+                img.resize(w, new_h, image::imageops::FilterType::Lanczos3)
+            }
+            (None, Some(h)) => {
+                // Scale by height, preserve aspect ratio
+                let scale = h as f32 / orig_h as f32;
+                let new_w = (orig_w as f32 * scale) as u32;
+                img.resize(new_w, h, image::imageops::FilterType::Lanczos3)
+            }
+            (Some(w), Some(h)) => {
+                // Fit within bounds, preserve aspect ratio
+                img.resize(w, h, image::imageops::FilterType::Lanczos3)
+            }
+        };
+
+        // Save to temp directory as PNG
+        let output_path = output_dir.join(format!("{}.png", id));
+        output_img
+            .save(&output_path)
+            .with_context(|| format!("Failed to save preview for generation {}", id))?;
+
+        println!("{}", output_path.display());
+    }
 
     Ok(())
 }

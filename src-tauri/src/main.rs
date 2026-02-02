@@ -5,7 +5,11 @@ use pixery_lib::cli;
 
 #[derive(Parser)]
 #[command(name = "pixery")]
-#[command(about = "Unified image generation tool")]
+#[command(about = "Unified image generation tool with CLI and GUI interfaces")]
+#[command(long_about = "Unified image generation tool with CLI and GUI interfaces.\n\n\
+    Subcommands provide CLI access; no args launches the GUI.\n\n\
+    Supports Gemini, fal.ai, and OpenAI providers. Images are archived to ~/media/image-gen/ \
+    with SQLite metadata tracking.")]
 struct Args {
     #[command(subcommand)]
     command: Option<cli::Commands>,
