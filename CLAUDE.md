@@ -196,3 +196,14 @@ If migrating old data, either:
 2. Re-import images by reading the old JSON metadata files (stored alongside images in Python version)
 
 The Rust version starts fresh with a clean schema.
+
+Writing CLAUDE.md Files
+----------
+
+**DO NOT document "what to do"** — the code demonstrates patterns. Prescribing implementation creates false precedents and becomes stale when code evolves. Instead, document what NOT to do — anti-patterns are clearer to evaluate, allow implementation flexibility, and prevent specific identified mistakes.
+
+**DO NOT repeat locally-discoverable information** — directory structures, existing patterns, and conventions visible from reading nearby code waste tokens and create noise. Memory should capture cross-cutting context that requires exploration beyond the local directory.
+
+**DO NOT omit rationale** — constraints without "why" are arbitrary rules. The reasoning is what makes them durable across refactors and evaluable in edge cases. "Don't do X because it breaks Y" remains valid as implementations change.
+
+**Exception**: The root memory captures product philosophy and essence - inherently positive statements that can't be derived from code and can't be meaningfully expressed as negations.
