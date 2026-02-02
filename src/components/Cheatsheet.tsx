@@ -10,7 +10,7 @@ const shortcuts = [
   { key: 'f', action: 'Toggle starred' },
   { key: 't', action: 'Focus tag input' },
   { key: 'g', action: 'Open generate form' },
-  { key: '/', action: 'Focus tag filter' },
+  { key: '/', action: 'Focus filter bar' },
   { key: 'r', action: 'Remix selected' },
   { key: 'c', action: 'Compare mode (2 selected)' },
   { key: 'Esc', action: 'Close panel / clear selection' },

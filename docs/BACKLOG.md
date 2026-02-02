@@ -78,7 +78,7 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
-- [x] Tag filter bar - replaces search bar with tag-based filtering; autocomplete dropdown, chips for selected tags, multi-tag AND logic, sidebar tags toggle filter
+- [x] Tag filter bar - replaces search bar with tag/model filtering; autocomplete dropdown, chips for selected filters, multi-tag AND logic, model names as virtual tags, sidebar tags toggle filter
 - [x] GenerateModal with gallery browser - replaces dropdown form; browse gallery to select references, preview strip at bottom, Reference button in Details pre-loads current image
 - [x] CLI image preview for Claude (`pixery view <ids>... [--width] [--height]`) - outputs resized images to `/tmp/pixery-preview/` for agent viewing
 - [x] Generation progress feedback system (jobs table, header indicator)

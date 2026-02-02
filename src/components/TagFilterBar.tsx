@@ -1,5 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import type { TagCount } from '../lib/types';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import type { TagCount, ModelInfo } from '../lib/types';
+
+type SuggestionItem = {
+  type: 'tag' | 'model';
+  name: string;
+  displayName: string;
+  count?: number;
+};
 
 interface TagFilterBarProps {
   filterTags: string[];
@@ -7,6 +14,9 @@ interface TagFilterBarProps {
   onRemoveTag: (tag: string) => void;
   onClearTags: () => void;
   availableTags: TagCount[];
+  models: ModelInfo[];
+  filterModel: string | null;
+  onSetModel: (model: string | null) => void;
 }
 
 export function TagFilterBar({
@@ -15,6 +25,9 @@ export function TagFilterBar({
   onRemoveTag,
   onClearTags,
   availableTags,
+  models,
+  filterModel,
+  onSetModel,
 }: TagFilterBarProps) {
   const [inputValue, setInputValue] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -22,12 +35,31 @@ export function TagFilterBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Filter suggestions: exclude already-selected tags, match input
-  const suggestions = availableTags.filter(
-    (tag) =>
-      !filterTags.includes(tag.name) &&
-      tag.name.toLowerCase().includes(inputValue.toLowerCase())
-  );
+  // Combined suggestions: tags + models
+  const suggestions = useMemo(() => {
+    const query = inputValue.toLowerCase();
+    const items: SuggestionItem[] = [];
+
+    // Add matching tags
+    for (const tag of availableTags) {
+      if (!filterTags.includes(tag.name) && tag.name.toLowerCase().includes(query)) {
+        items.push({ type: 'tag', name: tag.name, displayName: tag.name, count: tag.count });
+      }
+    }
+
+    // Add matching models (exclude already-selected model)
+    for (const model of models) {
+      const matchesId = model.id.toLowerCase().includes(query);
+      const matchesName = model.display_name.toLowerCase().includes(query);
+      if ((matchesId || matchesName) && model.id !== filterModel) {
+        items.push({ type: 'model', name: model.id, displayName: model.display_name });
+      }
+    }
+
+    return items;
+  }, [availableTags, models, filterTags, filterModel, inputValue]);
+
+  const hasFilters = filterTags.length > 0 || filterModel !== null;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
@@ -35,19 +67,28 @@ export function TagFilterBar({
     setHighlightedIndex(0);
   };
 
-  const handleSelectTag = useCallback((tagName: string) => {
-    onAddTag(tagName);
+  const handleSelectItem = useCallback((item: SuggestionItem) => {
+    if (item.type === 'model') {
+      onSetModel(item.name);
+    } else {
+      onAddTag(item.name);
+    }
     setInputValue('');
     setShowDropdown(false);
     setHighlightedIndex(0);
     inputRef.current?.focus();
-  }, [onAddTag]);
+  }, [onAddTag, onSetModel]);
+
+  const handleClearAll = useCallback(() => {
+    onClearTags();
+    onSetModel(null);
+  }, [onClearTags, onSetModel]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (suggestions.length > 0 && highlightedIndex < suggestions.length) {
-        handleSelectTag(suggestions[highlightedIndex].name);
+        handleSelectItem(suggestions[highlightedIndex]);
       }
     } else if (e.key === 'Escape') {
       setShowDropdown(false);
@@ -58,8 +99,13 @@ export function TagFilterBar({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setHighlightedIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === 'Backspace' && inputValue === '' && filterTags.length > 0) {
-      onRemoveTag(filterTags[filterTags.length - 1]);
+    } else if (e.key === 'Backspace' && inputValue === '') {
+      // Remove last filter (model first if present, then last tag)
+      if (filterModel) {
+        onSetModel(null);
+      } else if (filterTags.length > 0) {
+        onRemoveTag(filterTags[filterTags.length - 1]);
+      }
     }
   };
 
@@ -93,7 +139,7 @@ export function TagFilterBar({
           ref={inputRef}
           id="tag-filter-input"
           type="text"
-          placeholder={filterTags.length === 0 ? "Filter by tag... (press /)" : "Add tag..."}
+          placeholder={hasFilters ? "Add filter..." : "Filter by tag or model... (press /)"}
           value={inputValue}
           onChange={handleInputChange}
           onFocus={() => setShowDropdown(true)}
@@ -102,15 +148,20 @@ export function TagFilterBar({
         />
         {showDropdown && suggestions.length > 0 && (
           <div ref={dropdownRef} className="tag-suggestions">
-            {suggestions.slice(0, 8).map((tag, index) => (
+            {suggestions.slice(0, 8).map((item, index) => (
               <button
-                key={tag.name}
+                key={`${item.type}-${item.name}`}
                 className={`tag-suggestion ${index === highlightedIndex ? 'tag-suggestion-highlighted' : ''}`}
-                onClick={() => handleSelectTag(tag.name)}
+                onClick={() => handleSelectItem(item)}
                 onMouseEnter={() => setHighlightedIndex(index)}
               >
-                <span className="tag-suggestion-name">{tag.name}</span>
-                <span className="tag-suggestion-count">{tag.count}</span>
+                <span className="tag-suggestion-name">
+                  {item.type === 'model' && <span className="tag-suggestion-type">model</span>}
+                  {item.displayName}
+                </span>
+                {item.count !== undefined && (
+                  <span className="tag-suggestion-count">{item.count}</span>
+                )}
               </button>
             ))}
           </div>
@@ -118,10 +169,10 @@ export function TagFilterBar({
       </div>
 
       <button
-        className={`tag-filter-clear ${filterTags.length > 0 ? 'tag-filter-clear-active' : ''}`}
-        onClick={onClearTags}
-        disabled={filterTags.length === 0}
-        aria-label="Clear all tag filters"
+        className={`tag-filter-clear ${hasFilters ? 'tag-filter-clear-active' : ''}`}
+        onClick={handleClearAll}
+        disabled={!hasFilters}
+        aria-label="Clear all filters"
         title="Clear all filters"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -129,8 +180,22 @@ export function TagFilterBar({
         </svg>
       </button>
 
-      {filterTags.length > 0 && (
+      {hasFilters && (
         <div className="tag-filter-chips">
+          {filterModel && (
+            <span className="chip chip-active tag-chip model-chip">
+              {models.find(m => m.id === filterModel)?.display_name || filterModel}
+              <button
+                className="tag-chip-remove"
+                onClick={() => onSetModel(null)}
+                aria-label={`Remove ${filterModel} filter`}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  <path d="M9.35 3.35a.5.5 0 0 0-.7-.7L6 5.29 3.35 2.65a.5.5 0 1 0-.7.7L5.29 6 2.65 8.65a.5.5 0 1 0 .7.7L6 6.71l2.65 2.64a.5.5 0 0 0 .7-.7L6.71 6l2.64-2.65z"/>
+                </svg>
+              </button>
+            </span>
+          )}
           {filterTags.map((tag) => (
             <span key={tag} className="chip chip-active tag-chip">
               {tag}
@@ -194,9 +259,22 @@ export function TagFilterBar({
           color: var(--text-primary);
         }
         .tag-suggestion-name {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-xs);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+        .tag-suggestion-type {
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          padding: 1px 4px;
+          background: var(--accent-muted);
+          color: var(--accent);
+          border-radius: var(--radius-sm);
+          flex-shrink: 0;
         }
         .tag-suggestion-count {
           font-size: 12px;
@@ -216,6 +294,10 @@ export function TagFilterBar({
           align-items: center;
           gap: 4px;
           max-width: 150px;
+        }
+        .model-chip {
+          background: var(--accent-muted);
+          border-color: var(--accent);
         }
         .tag-chip-remove {
           display: flex;

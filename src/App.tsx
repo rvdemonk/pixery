@@ -30,6 +30,7 @@ export default function App() {
   // Filter state
   const [filter, setFilter] = useState<ListFilter>({ limit: 100 });
   const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterModel, setFilterModel] = useState<string | null>(null);
   const [starredOnly, setStarredOnly] = useState(false);
 
   // Selection state
@@ -122,14 +123,15 @@ export default function App() {
     };
   }, [refresh, refreshTags]);
 
-  // Update filter when tags/starred changes
+  // Update filter when tags/model/starred changes
   useEffect(() => {
     setFilter((prev) => ({
       ...prev,
       tags: filterTags.length > 0 ? filterTags : undefined,
+      model: filterModel || undefined,
       starred_only: starredOnly,
     }));
-  }, [filterTags, starredOnly]);
+  }, [filterTags, filterModel, starredOnly]);
 
   // Tag filter handlers
   const addFilterTag = useCallback((tag: string) => {
@@ -391,6 +393,9 @@ export default function App() {
             onRemoveTag={removeFilterTag}
             onClearTags={clearFilterTags}
             availableTags={tags}
+            models={models}
+            filterModel={filterModel}
+            onSetModel={setFilterModel}
           />
           <JobsIndicator
             jobs={jobs}
@@ -440,6 +445,7 @@ export default function App() {
           onRemix={handleOpenRemix}
           onReference={handleOpenReference}
           onTrash={handleTrash}
+          onOpenFullViewer={() => setLightboxOpen(true)}
         />
       )}
 
