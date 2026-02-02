@@ -93,25 +93,50 @@ textarea {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  transition: width var(--transition-normal);
+  overflow: visible;
+  transition: width var(--transition-normal), border-color var(--transition-fast);
 }
 
-.sidebar:hover {
+/* Hide sidebar border when expanded */
+.sidebar:hover,
+.sidebar.sidebar-pinned {
+  border-right-color: transparent;
+}
+
+/* Expanded content panel - overlay by default */
+.sidebar .sidebar-content {
+  position: absolute;
+  top: 0;
+  left: 48px;
+  width: 192px;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-8px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  z-index: 100;
+}
+
+.sidebar:hover .sidebar-content {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+/* Pinned state - shifts gallery, content stays in same position */
+.sidebar.sidebar-pinned {
   width: 240px;
 }
 
-.sidebar .column-header,
-.sidebar .sidebar-section,
-.sidebar .sidebar-footer {
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-}
-
-.sidebar:hover .column-header,
-.sidebar:hover .sidebar-section,
-.sidebar:hover .sidebar-footer {
+.sidebar.sidebar-pinned .sidebar-content {
   opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
 }
 
 .main-content {

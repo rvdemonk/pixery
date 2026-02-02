@@ -40,6 +40,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     generation: Generation;
     position: { x: number; y: number };
@@ -297,6 +298,8 @@ export default function App() {
         starredOnly={starredOnly}
         onToggleStarred={() => setStarredOnly(!starredOnly)}
         onOpenDashboard={() => setView('dashboard')}
+        pinned={sidebarPinned}
+        onTogglePin={() => setSidebarPinned(!sidebarPinned)}
       />
 
       <main className="main-content">

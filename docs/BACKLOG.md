@@ -33,10 +33,6 @@ High priority items to tackle next.
 
 - [ ] `#feature` CLI image preview for Claude - add command to output images at configurable resolutions (e.g. `pixery preview <id> --width 800`); helps Claude review generations without clogging context; need to find optimal resolution for detail vs token efficiency
 
-- [ ] `#ux` Expandable sidebar rework - research better patterns, current implementation is tacky
-
-- [ ] `#ux` Sidebar expansion behavior - hamburger icon must stay in place (don't move/remove buttons); click to pin expansion; only when pinned should gallery thumbs shift to make room; unpinned = overlay only
-
 - [ ] `#ux` Details close button - make X button larger, follow best practices for dismiss targets
 
 - [ ] `#ux` Shared close button component - create reusable X button for all closeable elements (cost dashboard, popups, detail column)
@@ -91,6 +87,7 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] Sidebar overlay mode (hover = overlay, click = pin to shift gallery)
 - [x] Gallery auto-refreshes on new generations (FSEvents watcher fixed)
 - [x] Regenerate includes original reference images
 - [x] Edit & regenerate flow via Remix modal (modify prompt, refs, model before regenerating)
