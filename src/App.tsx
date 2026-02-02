@@ -155,7 +155,7 @@ export default function App() {
       prompt: selectedGeneration.prompt,
       model,
       tags: selectedGeneration.tags,
-      reference_paths: [],
+      reference_paths: selectedGeneration.references.map(ref => ref.path),
       copy_to: null,
     });
     if (result) {
