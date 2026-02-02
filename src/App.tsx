@@ -11,7 +11,7 @@ import { useSettings } from './hooks/useSettings';
 import { Sidebar } from './components/Sidebar';
 import { Gallery } from './components/Gallery';
 import { Details } from './components/Details';
-import { GenerateModal } from './components/GenerateModal';
+import { GenerateModal, type GenerateModalInitialState } from './components/GenerateModal';
 import { Compare } from './components/Compare';
 import { Dashboard } from './components/Dashboard';
 import { Cheatsheet } from './components/Cheatsheet';
@@ -39,6 +39,7 @@ export default function App() {
   // UI state
   const [view, setView] = useState<View>('gallery');
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [generateInitialState, setGenerateInitialState] = useState<GenerateModalInitialState | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -204,6 +205,25 @@ export default function App() {
     setRemixOpen(true);
   }, [selectedGeneration]);
 
+  // Open generate modal with current image as a reference
+  const handleOpenReference = useCallback(() => {
+    if (!selectedGeneration) return;
+    const lineage = selectedGeneration.references.map((ref) => ({
+      id: ref.id,
+      path: ref.path,
+      thumbPath: null,
+    }));
+    setGenerateInitialState({
+      references: [{
+        id: selectedGeneration.id,
+        path: selectedGeneration.image_path,
+        thumbPath: selectedGeneration.thumb_path,
+      }],
+      lineage,
+    });
+    setGenerateOpen(true);
+  }, [selectedGeneration]);
+
   // Generate from remix modal
   const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[], tags: string[]) => {
     if (!selectedGeneration) return;
@@ -306,7 +326,10 @@ export default function App() {
       // TODO: implement multi-select for compare
     },
     onRegenerate: handleOpenRemix,
-    onFocusGenerate: () => setGenerateOpen(true),
+    onFocusGenerate: () => {
+      setGenerateInitialState(undefined);
+      setGenerateOpen(true);
+    },
     onFocusSearch: () => document.getElementById('search-input')?.focus(),
     onShowHelp: () => setShowHelp(true),
     onEscape: () => {
@@ -370,7 +393,10 @@ export default function App() {
           />
           <button
             className="btn btn-primary"
-            onClick={() => setGenerateOpen(true)}
+            onClick={() => {
+              setGenerateInitialState(undefined);
+              setGenerateOpen(true);
+            }}
           >
             Generate
           </button>
@@ -404,6 +430,7 @@ export default function App() {
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
           onRemix={handleOpenRemix}
+          onReference={handleOpenReference}
           onTrash={handleTrash}
         />
       )}
@@ -481,7 +508,11 @@ export default function App() {
       {generateOpen && (
         <GenerateModal
           models={models}
-          onClose={() => setGenerateOpen(false)}
+          initialState={generateInitialState}
+          onClose={() => {
+            setGenerateOpen(false);
+            setGenerateInitialState(undefined);
+          }}
           onGenerate={handleGenerate}
         />
       )}

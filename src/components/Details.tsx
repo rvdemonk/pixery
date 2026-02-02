@@ -13,6 +13,7 @@ interface DetailsProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onRemix: () => void;
+  onReference: () => void;
   onTrash: () => void;
 }
 
@@ -25,6 +26,7 @@ export const Details = memo(function Details({
   onAddTag,
   onRemoveTag,
   onRemix,
+  onReference,
   onTrash,
 }: DetailsProps) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -213,9 +215,14 @@ export const Details = memo(function Details({
 
         {/* Actions (bottom) */}
         <div className="details-actions">
-          <button className="btn btn-primary details-remix-btn" onClick={onRemix}>
-            Remix
-          </button>
+          <div className="details-action-row">
+            <button className="btn btn-primary details-action-btn" onClick={onRemix}>
+              Remix
+            </button>
+            <button className="btn btn-secondary details-action-btn" onClick={onReference}>
+              Reference
+            </button>
+          </div>
           <button className="btn btn-ghost btn-danger-text" onClick={() => setShowTrashConfirm(true)}>
             Trash
           </button>
@@ -473,9 +480,13 @@ export const Details = memo(function Details({
           padding-top: var(--spacing-md);
           border-top: 1px solid var(--border);
         }
-        .details-remix-btn {
-          width: 100%;
+        .details-action-row {
+          display: flex;
+          gap: var(--spacing-sm);
           margin-bottom: var(--spacing-sm);
+        }
+        .details-action-btn {
+          flex: 1;
         }
         .btn-danger-text {
           color: var(--text-muted);
