@@ -17,6 +17,9 @@ import { Cheatsheet } from './components/Cheatsheet';
 import { ContextMenu } from './components/ContextMenu';
 import { Lightbox } from './components/Lightbox';
 import { JobsIndicator } from './components/JobsIndicator';
+import { RemixModal } from './components/RemixModal';
+import { GalleryPickerModal } from './components/GalleryPickerModal';
+import type { Reference } from './lib/types';
 
 type View = 'gallery' | 'compare' | 'dashboard';
 
@@ -41,6 +44,11 @@ export default function App() {
     generation: Generation;
     position: { x: number; y: number };
   } | null>(null);
+
+  // Remix state
+  const [remixOpen, setRemixOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [remixReferences, setRemixReferences] = useState<Reference[]>([]);
 
   // Models
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -125,12 +133,6 @@ export default function App() {
     refresh();
   }, [selectedId, refresh]);
 
-  const handleUpdatePrompt = useCallback(async (prompt: string) => {
-    if (!selectedId) return;
-    await api.updatePrompt(selectedId, prompt);
-    refresh();
-  }, [selectedId, refresh]);
-
   const handleUpdateTitle = useCallback(async (title: string | null) => {
     if (!selectedId) return;
     await api.updateTitle(selectedId, title);
@@ -149,13 +151,25 @@ export default function App() {
     refresh();
   }, [selectedId, removeTag, refresh]);
 
-  const handleRegenerate = useCallback(async (model: string) => {
+  // Open remix modal with current generation's references
+  const handleOpenRemix = useCallback(() => {
     if (!selectedGeneration) return;
+    setRemixReferences([...selectedGeneration.references]);
+    setRemixOpen(true);
+  }, [selectedGeneration]);
+
+  // Generate from remix modal
+  const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[]) => {
+    if (!selectedGeneration) return;
+    // Close modals immediately
+    setRemixOpen(false);
+    setPickerOpen(false);
+    // Generate in background
     const result = await generate({
-      prompt: selectedGeneration.prompt,
+      prompt,
       model,
       tags: selectedGeneration.tags,
-      reference_paths: selectedGeneration.references.map(ref => ref.path),
+      reference_paths: referencePaths,
       copy_to: null,
     });
     if (result) {
@@ -164,6 +178,29 @@ export default function App() {
       setSelectedId(result.id);
     }
   }, [selectedGeneration, generate, refresh, refreshTags]);
+
+  // Add reference from gallery picker
+  const handleAddReferenceFromPicker = useCallback((generation: Generation) => {
+    // Create a pseudo-reference from the generation
+    const newRef: Reference = {
+      id: generation.id, // Using generation id as ref id for tracking
+      hash: '', // Not needed for display
+      path: generation.image_path,
+      created_at: generation.created_at,
+    };
+    // Don't add duplicates
+    setRemixReferences((prev) => {
+      if (prev.some((r) => r.path === newRef.path)) {
+        return prev;
+      }
+      return [...prev, newRef];
+    });
+  }, []);
+
+  // Remove reference
+  const handleRemoveRemixReference = useCallback((refId: number) => {
+    setRemixReferences((prev) => prev.filter((r) => r.id !== refId));
+  }, []);
 
   const handleTrash = useCallback(async () => {
     if (!selectedId) return;
@@ -222,7 +259,7 @@ export default function App() {
     onCompare: () => {
       // TODO: implement multi-select for compare
     },
-    onRegenerate: () => selectedGeneration && handleRegenerate(selectedGeneration.model),
+    onRegenerate: handleOpenRemix,
     onFocusGenerate: () => setGenerateOpen(true),
     onFocusSearch: () => document.getElementById('search-input')?.focus(),
     onShowHelp: () => setShowHelp(true),
@@ -231,6 +268,10 @@ export default function App() {
         setLightboxOpen(false);
       } else if (contextMenu) {
         setContextMenu(null);
+      } else if (pickerOpen) {
+        setPickerOpen(false);
+      } else if (remixOpen) {
+        setRemixOpen(false);
       } else if (showHelp) {
         setShowHelp(false);
       } else if (view !== 'gallery') {
@@ -312,11 +353,10 @@ export default function App() {
           models={models}
           onClose={() => setDetailsOpen(false)}
           onToggleStar={handleToggleStar}
-          onUpdatePrompt={handleUpdatePrompt}
           onUpdateTitle={handleUpdateTitle}
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
-          onRegenerate={handleRegenerate}
+          onRemix={handleOpenRemix}
           onTrash={handleTrash}
         />
       )}
@@ -358,6 +398,26 @@ export default function App() {
           onPrevious={selectPrevious}
           hasNext={hasNext}
           hasPrevious={hasPrevious}
+        />
+      )}
+
+      {remixOpen && selectedGeneration && (
+        <RemixModal
+          generation={selectedGeneration}
+          models={models}
+          references={remixReferences}
+          onClose={() => setRemixOpen(false)}
+          onGenerate={handleRemixGenerate}
+          onAddReference={() => setPickerOpen(true)}
+          onRemoveReference={handleRemoveRemixReference}
+        />
+      )}
+
+      {pickerOpen && (
+        <GalleryPickerModal
+          selectedRefIds={new Set(remixReferences.map((r) => r.id))}
+          onSelect={handleAddReferenceFromPicker}
+          onClose={() => setPickerOpen(false)}
         />
       )}
 

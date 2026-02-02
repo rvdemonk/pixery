@@ -11,7 +11,7 @@ const shortcuts = [
   { key: 't', action: 'Focus tag input' },
   { key: 'g', action: 'Open generate form' },
   { key: '/', action: 'Focus search' },
-  { key: 'r', action: 'Regenerate selected' },
+  { key: 'r', action: 'Remix selected' },
   { key: 'c', action: 'Compare mode (2 selected)' },
   { key: 'Esc', action: 'Close panel / clear selection' },
   { key: '⌘/Ctrl + Del', action: 'Delete selected' },

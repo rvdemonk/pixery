@@ -9,11 +9,10 @@ interface DetailsProps {
   models: ModelInfo[];
   onClose: () => void;
   onToggleStar: () => void;
-  onUpdatePrompt: (prompt: string) => void;
   onUpdateTitle: (title: string | null) => void;
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
-  onRegenerate: (model: string) => void;
+  onRemix: () => void;
   onTrash: () => void;
 }
 
@@ -22,40 +21,26 @@ export const Details = memo(function Details({
   models,
   onClose,
   onToggleStar,
-  onUpdatePrompt,
   onUpdateTitle,
   onAddTag,
   onRemoveTag,
-  onRegenerate,
+  onRemix,
   onTrash,
 }: DetailsProps) {
-  const [editingPrompt, setEditingPrompt] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
-  const [promptValue, setPromptValue] = useState(generation.prompt);
   const [titleValue, setTitleValue] = useState(generation.title || '');
-  const [selectedModel, setSelectedModel] = useState(generation.model);
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [metadataExpanded, setMetadataExpanded] = useState(false);
 
   // Sync local state when selected generation changes
   useEffect(() => {
-    setPromptValue(generation.prompt);
     setTitleValue(generation.title || '');
-    setSelectedModel(generation.model);
-    setEditingPrompt(false);
     setEditingTitle(false);
     setShowTrashConfirm(false);
     setPromptExpanded(false);
     setMetadataExpanded(false);
   }, [generation.id]);
-
-  const handlePromptSave = () => {
-    if (promptValue !== generation.prompt) {
-      onUpdatePrompt(promptValue);
-    }
-    setEditingPrompt(false);
-  };
 
   const handleTitleSave = () => {
     const newTitle = titleValue.trim() || null;
@@ -155,39 +140,20 @@ export const Details = memo(function Details({
           />
         </div>
 
-        {/* Prompt (collapsible) */}
+        {/* Prompt (collapsible, read-only) */}
         <div className="details-section">
           <button
             className="collapse-header"
-            onClick={() => !editingPrompt && setPromptExpanded(!promptExpanded)}
+            onClick={() => setPromptExpanded(!promptExpanded)}
           >
             <span className={`collapse-arrow ${promptExpanded ? 'expanded' : ''}`}>▶</span>
             <span className="details-label" style={{ marginBottom: 0 }}>Prompt</span>
           </button>
           {promptExpanded && (
             <div className="collapse-content">
-              {editingPrompt ? (
-                <div className="prompt-edit">
-                  <textarea
-                    value={promptValue}
-                    onChange={(e) => setPromptValue(e.target.value)}
-                    rows={6}
-                    autoFocus
-                  />
-                  <div className="prompt-edit-actions">
-                    <button className="btn btn-sm btn-secondary" onClick={() => setEditingPrompt(false)}>
-                      Cancel
-                    </button>
-                    <button className="btn btn-sm btn-primary" onClick={handlePromptSave}>
-                      Save
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="prompt-text" onClick={() => setEditingPrompt(true)}>
-                  <Markdown>{generation.prompt}</Markdown>
-                </div>
-              )}
+              <div className="prompt-text">
+                <Markdown>{generation.prompt}</Markdown>
+              </div>
             </div>
           )}
         </div>
@@ -247,24 +213,9 @@ export const Details = memo(function Details({
 
         {/* Actions (bottom) */}
         <div className="details-actions">
-          <div className="regenerate-form">
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-            >
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.display_name} (${m.cost_per_image.toFixed(3)})
-                </option>
-              ))}
-            </select>
-            <button
-              className="btn btn-primary"
-              onClick={() => onRegenerate(selectedModel)}
-            >
-              Regenerate
-            </button>
-          </div>
+          <button className="btn btn-primary details-remix-btn" onClick={onRemix}>
+            Remix
+          </button>
           <button className="btn btn-ghost btn-danger-text" onClick={() => setShowTrashConfirm(true)}>
             Trash
           </button>
@@ -473,12 +424,8 @@ export const Details = memo(function Details({
           background: var(--bg-primary);
           padding: var(--spacing-sm);
           border-radius: var(--radius-md);
-          cursor: pointer;
           font-size: 13px;
           line-height: 1.5;
-        }
-        .prompt-text:hover {
-          background: var(--bg-hover);
         }
         .prompt-text p {
           margin-bottom: var(--spacing-sm);
@@ -519,15 +466,6 @@ export const Details = memo(function Details({
         .prompt-text em {
           font-style: italic;
         }
-        .prompt-edit textarea {
-          width: 100%;
-          margin-bottom: var(--spacing-sm);
-        }
-        .prompt-edit-actions {
-          display: flex;
-          gap: var(--spacing-sm);
-          justify-content: flex-end;
-        }
 
         /* Actions */
         .details-actions {
@@ -535,13 +473,9 @@ export const Details = memo(function Details({
           padding-top: var(--spacing-md);
           border-top: 1px solid var(--border);
         }
-        .regenerate-form {
-          display: flex;
-          gap: var(--spacing-sm);
+        .details-remix-btn {
+          width: 100%;
           margin-bottom: var(--spacing-sm);
-        }
-        .regenerate-form select {
-          flex: 1;
         }
         .btn-danger-text {
           color: var(--text-muted);
