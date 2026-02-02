@@ -11,6 +11,8 @@ Unified image generation tool with CLI and GUI interfaces. Single Rust binary se
 
 See `docs/BACKLOG.md` for current priorities and `docs/CHANGELOG.md` for release history.
 
+**Workflow:** When completing a backlog item, immediately update `docs/BACKLOG.md` - remove from its section and add to Completed under Unreleased.
+
 Origin
 ----------
 

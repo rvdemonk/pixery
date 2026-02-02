@@ -13,11 +13,7 @@ Prioritized work items for Pixery. Tags: `#bug`, `#tech-debt`, `#feature`, `#ux`
 
 Critical issues that must be fixed before next release.
 
-- [ ] `#bug` Gallery not auto-refreshing on new generations - FSEvents watcher not triggering updates; still requires manual tag toggle workaround
-
-- [ ] `#bug` Regenerate should include original reference images - when clicking regenerate in details, resend the same refs used in the original generation
-
-- [ ] `#feature` Edit & regenerate flow - add option to edit prompt and/or attach new reference images before regenerating; current regenerate is "same prompt, pick model" but need "modify prompt, modify refs, then regenerate"
+*None currently.*
 
 ---
 
@@ -33,6 +29,8 @@ Items currently being worked on.
 
 High priority items to tackle next.
 
+- [ ] `#ux` Generation progress feedback system - show feedback when image generation is in progress; design as general API usable from multiple entry points (GUI regenerate button, CLI backend when Claude triggers generation); suggested: indicator in top banner showing count of pending generations, hoverable for details (time since request, model, prompt preview); should work for both GUI-initiated and CLI-initiated generations
+
 - [ ] `#feature` CLI image preview for Claude - add command to output images at configurable resolutions (e.g. `pixery preview <id> --width 800`); helps Claude review generations without clogging context; need to find optimal resolution for detail vs token efficiency
 
 - [ ] `#ux` Expandable sidebar rework - research better patterns, current implementation is tacky
@@ -46,6 +44,14 @@ High priority items to tackle next.
 - [ ] `#feature` Settings dashboard - popup like cost dashboard with dropdowns/toggles; settings button (cog icon) appears next to cost (coin icon) in header
 
 - [ ] `#feature` Hidden tags setting - option in settings to hide specific tags; when enabled, hides images with those tags from gallery and search, hides tags from sidebar; requires "hidden_tags" infra (stored preference + filter logic)
+
+- [ ] `#ux` Cost dashboard icon - replace text link with coin icon and smaller text, consistent with other header actions
+
+- [ ] `#ux` Move filtering/search to header bar - relocate all filter controls from sidebar to header; keep sidebar free for future functionality
+
+- [ ] `#feature` Model duration estimation for progress indicators - analyze generations per model to estimate response times; use estimates for model-specific progress bars in header showing in-progress generations; after first N generations for a model with insufficient data, store duration estimate in DB
+
+- [ ] `#ux` Toggleable details panel size - allow small/medium/large panel widths
 
 ---
 
@@ -61,6 +67,8 @@ Items to address when bandwidth allows.
 
 - [ ] `#feature` Notifications - alert when background generation completes (plugin configured, not implemented)
 
+- [ ] `#feature` Enhanced cost dashboard - make interactive with filtering by date range, models, and tags; drill-down views for cost analysis
+
 
 ---
 
@@ -73,6 +81,8 @@ Ideas and features for future consideration.
 - [ ] `#feature` Cost tracking and reporting
 - [ ] `#feature` Tag management UI in sidebar
 - [ ] `#feature` Export/import database for backup
+- [ ] `#feature` Model info page - dedicated view explaining each model's strengths, weaknesses, costs, output sizes, and optimal use cases
+- [ ] `#feature` Semantic tagging/RAG system - auto-generate tags from prompts, titles, and existing tags using embedding-based search; future exploration
 
 ---
 
@@ -81,6 +91,9 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] Gallery auto-refreshes on new generations (FSEvents watcher fixed)
+- [x] Regenerate includes original reference images
+- [x] Edit & regenerate flow via Remix modal (modify prompt, refs, model before regenerating)
 - [x] Reference images shown in details panel as thumbnails
 - [x] Progressive disclosure in details - prompt/metadata collapsed by default
 - [x] Image ID prominently displayed for easy human-AI communication
