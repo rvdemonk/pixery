@@ -15,6 +15,7 @@ interface DetailsProps {
   onRemix: () => void;
   onReference: () => void;
   onTrash: () => void;
+  onOpenFullViewer: () => void;
 }
 
 export const Details = memo(function Details({
@@ -28,6 +29,7 @@ export const Details = memo(function Details({
   onRemix,
   onReference,
   onTrash,
+  onOpenFullViewer,
 }: DetailsProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(generation.title || '');
@@ -78,7 +80,11 @@ export const Details = memo(function Details({
       </div>
 
       <div className="details-image">
-        <img src={getImageUrl(generation.image_path)} alt={generation.slug} />
+        <img
+          src={getImageUrl(generation.image_path)}
+          alt={generation.slug}
+          onClick={onOpenFullViewer}
+        />
       </div>
 
       <div className="details-content">
@@ -267,6 +273,7 @@ export const Details = memo(function Details({
         .details-image img {
           width: 100%;
           border-radius: var(--radius-md);
+          cursor: pointer;
         }
         .details-content {
           padding: var(--spacing-md);
