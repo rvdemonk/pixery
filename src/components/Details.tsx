@@ -95,8 +95,9 @@ export function Details({
       </div>
 
       <div className="details-content">
-        {/* Title */}
+        {/* ID + Title */}
         <div className="details-title-section">
+          <span className="image-id">#{generation.id}</span>
           {editingTitle ? (
             <input
               type="text"
@@ -318,6 +319,14 @@ export function Details({
         /* Title */
         .details-title-section {
           margin-bottom: var(--spacing-sm);
+        }
+        .image-id {
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+          display: block;
+          margin-bottom: 2px;
         }
         .title-display {
           font-size: 18px;

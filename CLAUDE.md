@@ -22,6 +22,18 @@ Born from the rpg-project image generation experiments (January 2026). Started a
 
 The driving use case is **Claude-assisted creative work** - generating character art, sprites, concept images where Claude selects models, crafts prompts, and iterates based on visual feedback. The CLI is optimized for Claude; the GUI is optimized for Lewis.
 
+**Design Philosophy: Human-AI Collaboration**
+
+Every feature should facilitate collaboration between Lewis (GUI) and Claude (CLI). Examples:
+
+- **Image IDs prominently displayed** - Lewis can easily say "look at #140" to reference specific images
+- **CLI image preview at configurable resolutions** - Claude can view images without clogging context
+- **Tag/filter/sort via CLI** - Claude can query `pixery list --tag character --limit 5` to find relevant images
+- **References shown in details** - Both parties can see what inputs produced an output
+- **Regenerate with refs** - Iteration preserves the full creative context
+
+When adding features, ask: "Does this help Lewis communicate with Claude, or help Claude understand/act on the archive?"
+
 Architecture
 ----------
 

@@ -17,6 +17,8 @@ Critical issues that must be fixed before next release.
 
 - [ ] `#bug` Regenerate should include original reference images - when clicking regenerate in details, resend the same refs used in the original generation
 
+- [ ] `#feature` Edit & regenerate flow - add option to edit prompt and/or attach new reference images before regenerating; current regenerate is "same prompt, pick model" but need "modify prompt, modify refs, then regenerate"
+
 ---
 
 ## In Progress
@@ -40,10 +42,6 @@ High priority items to tackle next.
 - [ ] `#ux` Details close button - make X button larger, follow best practices for dismiss targets
 
 - [ ] `#ux` Shared close button component - create reusable X button for all closeable elements (cost dashboard, popups, detail column)
-
-- [ ] `#ux` Collapsible prompt in details - full prompt should require expansion, not show automatically
-
-- [ ] `#ux` Reference image lineage in details - show reference images as small clickable thumbnails next to prompts (data already in DB via references table)
 
 - [ ] `#feature` Settings dashboard - popup like cost dashboard with dropdowns/toggles; settings button (cog icon) appears next to cost (coin icon) in header
 
@@ -83,6 +81,10 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] Reference images shown in details panel as thumbnails
+- [x] Progressive disclosure in details - prompt/metadata collapsed by default
+- [x] Image ID prominently displayed for easy human-AI communication
+- [x] References bundled into Generation response (no loading delay)
 - [x] Fix blank screen when running release binary - was using `cargo build` instead of `npm run tauri build`
 - [x] Markdown rendering for prompts in details panel
 - [x] Single-click opens details (was double-click)
