@@ -7,6 +7,7 @@ import { useTags } from './hooks/useTags';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useGenerate } from './hooks/useGenerate';
 import { useJobs } from './hooks/useJobs';
+import { useSettings } from './hooks/useSettings';
 import { Sidebar } from './components/Sidebar';
 import { Gallery } from './components/Gallery';
 import { Details } from './components/Details';
@@ -19,6 +20,7 @@ import { Lightbox } from './components/Lightbox';
 import { JobsIndicator } from './components/JobsIndicator';
 import { RemixModal } from './components/RemixModal';
 import { GalleryPickerModal } from './components/GalleryPickerModal';
+import { Settings } from './components/Settings';
 import type { Reference } from './lib/types';
 
 type View = 'gallery' | 'compare' | 'dashboard';
@@ -41,6 +43,7 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     generation: Generation;
     position: { x: number; y: number };
@@ -55,10 +58,21 @@ export default function App() {
   const [models, setModels] = useState<ModelInfo[]>([]);
 
   // Hooks
-  const { generations, loading, refresh, search } = useGenerations({ filter });
-  const { tags, addTags, removeTag, refresh: refreshTags } = useTags();
+  const { generations: allGenerations, loading, refresh, search } = useGenerations({ filter });
+  const { tags: allTags, addTags, removeTag, refresh: refreshTags } = useTags();
   const { generating, error: generateError, generate } = useGenerate();
   const { jobs, activeCount } = useJobs();
+  const { hiddenTags, toggleHiddenTag } = useSettings();
+
+  // Filter out hidden tags
+  const generations = useMemo(
+    () => allGenerations.filter((g) => !g.tags.some((t) => hiddenTags.includes(t))),
+    [allGenerations, hiddenTags]
+  );
+  const tags = useMemo(
+    () => allTags.filter((t) => !hiddenTags.includes(t.name)),
+    [allTags, hiddenTags]
+  );
 
   // Load models on mount
   useEffect(() => {
@@ -269,6 +283,8 @@ export default function App() {
         setLightboxOpen(false);
       } else if (contextMenu) {
         setContextMenu(null);
+      } else if (settingsOpen) {
+        setSettingsOpen(false);
       } else if (pickerOpen) {
         setPickerOpen(false);
       } else if (remixOpen) {
@@ -298,6 +314,7 @@ export default function App() {
         starredOnly={starredOnly}
         onToggleStarred={() => setStarredOnly(!starredOnly)}
         onOpenDashboard={() => setView('dashboard')}
+        onOpenSettings={() => setSettingsOpen(true)}
         pinned={sidebarPinned}
         onTogglePin={() => setSidebarPinned(!sidebarPinned)}
       />
@@ -377,6 +394,15 @@ export default function App() {
 
       {view === 'dashboard' && (
         <Dashboard onClose={() => setView('gallery')} />
+      )}
+
+      {settingsOpen && (
+        <Settings
+          tags={allTags}
+          hiddenTags={hiddenTags}
+          onToggleHiddenTag={toggleHiddenTag}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
 
       {showHelp && (

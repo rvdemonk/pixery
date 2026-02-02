@@ -37,9 +37,6 @@ High priority items to tackle next.
 
 - [ ] `#ux` Shared close button component - create reusable X button for all closeable elements (cost dashboard, popups, detail column)
 
-- [ ] `#feature` Settings dashboard - popup like cost dashboard with dropdowns/toggles; settings button (cog icon) appears next to cost (coin icon) in header
-
-- [ ] `#feature` Hidden tags setting - option in settings to hide specific tags; when enabled, hides images with those tags from gallery and search, hides tags from sidebar; requires "hidden_tags" infra (stored preference + filter logic)
 
 - [ ] `#ux` Cost dashboard icon - replace text link with coin icon and smaller text, consistent with other header actions
 
@@ -87,6 +84,7 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] Settings modal with hidden tags (cog icon in header, localStorage persistence)
 - [x] Sidebar overlay mode (hover = overlay, click = pin to shift gallery)
 - [x] Gallery auto-refreshes on new generations (FSEvents watcher fixed)
 - [x] Regenerate includes original reference images

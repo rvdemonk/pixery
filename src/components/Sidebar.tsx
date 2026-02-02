@@ -7,6 +7,7 @@ interface SidebarProps {
   starredOnly: boolean;
   onToggleStarred: () => void;
   onOpenDashboard: () => void;
+  onOpenSettings: () => void;
   pinned: boolean;
   onTogglePin: () => void;
 }
@@ -18,6 +19,7 @@ export function Sidebar({
   starredOnly,
   onToggleStarred,
   onOpenDashboard,
+  onOpenSettings,
   pinned,
   onTogglePin,
 }: SidebarProps) {
@@ -75,6 +77,9 @@ export function Sidebar({
         <div className="sidebar-footer">
           <button className="sidebar-item" onClick={onOpenDashboard}>
             <span>Cost Dashboard</span>
+          </button>
+          <button className="sidebar-item" onClick={onOpenSettings}>
+            <span>Settings</span>
           </button>
         </div>
       </div>
