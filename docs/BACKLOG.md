@@ -31,6 +31,8 @@ Items currently being worked on.
 
 High priority items to tackle next.
 
+- [ ] `#feature` CLI image preview for Claude - add command to output images at configurable resolutions (e.g. `pixery preview <id> --width 800`); helps Claude review generations without clogging context; need to find optimal resolution for detail vs token efficiency
+
 - [ ] `#ux` Expandable sidebar rework - research better patterns, current implementation is tacky
 
 - [ ] `#ux` Sidebar expansion behavior - hamburger icon must stay in place (don't move/remove buttons); click to pin expansion; only when pinned should gallery thumbs shift to make room; unpinned = overlay only
@@ -61,7 +63,6 @@ Items to address when bandwidth allows.
 
 - [ ] `#feature` Notifications - alert when background generation completes (plugin configured, not implemented)
 
-- [ ] `#tech-debt` Build for release - currently dev mode only; needs `npm run tauri build` testing
 
 ---
 
@@ -82,6 +83,7 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] Fix blank screen when running release binary - was using `cargo build` instead of `npm run tauri build`
 - [x] Markdown rendering for prompts in details panel
 - [x] Single-click opens details (was double-click)
 - [x] Unified column headers (consistent height across sidebar, gallery, details)
