@@ -6,6 +6,7 @@ import type {
   TagCount,
   ModelInfo,
   CostSummary,
+  Reference,
 } from './types';
 
 export async function generateImage(params: GenerateParams): Promise<Generation> {
@@ -66,6 +67,10 @@ export async function listModels(): Promise<ModelInfo[]> {
 
 export async function getCostSummary(since?: string): Promise<CostSummary> {
   return invoke('get_cost_summary', { since });
+}
+
+export async function getReferences(id: number): Promise<Reference[]> {
+  return invoke('get_references', { id });
 }
 
 export function getImageUrl(path: string): string {

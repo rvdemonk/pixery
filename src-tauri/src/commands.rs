@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::archive;
 use crate::db::Database;
-use crate::models::{CostSummary, Generation, GenerateParams, ListFilter, ModelInfo, TagCount};
+use crate::models::{CostSummary, Generation, GenerateParams, ListFilter, ModelInfo, Reference, TagCount};
 use crate::providers;
 
 pub struct AppState {
@@ -195,4 +195,10 @@ pub fn get_image_path(path: String) -> String {
     // Convert file path to a format Tauri can serve
     // Using asset protocol
     format!("asset://localhost/{}", path)
+}
+
+#[tauri::command]
+pub fn get_references(state: State<'_, AppState>, id: i64) -> Result<Vec<Reference>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_references_for_generation(id).map_err(|e| e.to_string())
 }

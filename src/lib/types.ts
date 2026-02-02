@@ -20,6 +20,7 @@ export interface Generation {
   trashed_at: string | null;
   title: string | null;
   tags: string[];
+  references: Reference[];
 }
 
 export interface GenerateParams {
@@ -57,4 +58,11 @@ export interface CostSummary {
   by_model: [string, number][];
   by_day: [string, number][];
   count: number;
+}
+
+export interface Reference {
+  id: number;
+  hash: string;
+  path: string;
+  created_at: string;
 }

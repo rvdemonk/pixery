@@ -155,12 +155,14 @@ impl Database {
                     trashed_at: row.get(18)?,
                     title: row.get(19)?,
                     tags: vec![],
+                    references: vec![],
                 })
             })
             .optional()?;
 
         if let Some(mut g) = gen {
             g.tags = self.get_tags_for_generation(g.id)?;
+            g.references = self.get_references_for_generation(g.id)?;
             Ok(Some(g))
         } else {
             Ok(None)
@@ -250,6 +252,7 @@ impl Database {
                 trashed_at: row.get(18)?,
                 title: row.get(19)?,
                 tags: vec![],
+                references: vec![],
             })
         })?;
 
@@ -257,6 +260,7 @@ impl Database {
         for row in rows {
             let mut g = row?;
             g.tags = self.get_tags_for_generation(g.id)?;
+            g.references = self.get_references_for_generation(g.id)?;
             generations.push(g);
         }
 

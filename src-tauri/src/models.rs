@@ -150,6 +150,7 @@ pub struct Generation {
     pub trashed_at: Option<String>,
     pub title: Option<String>,
     pub tags: Vec<String>,
+    pub references: Vec<Reference>,
 }
 
 /// Parameters for generating a new image

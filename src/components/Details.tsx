@@ -35,6 +35,8 @@ export function Details({
   const [titleValue, setTitleValue] = useState(generation.title || '');
   const [selectedModel, setSelectedModel] = useState(generation.model);
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [metadataExpanded, setMetadataExpanded] = useState(false);
 
   // Sync local state when selected generation changes
   useEffect(() => {
@@ -44,6 +46,8 @@ export function Details({
     setEditingPrompt(false);
     setEditingTitle(false);
     setShowTrashConfirm(false);
+    setPromptExpanded(false);
+    setMetadataExpanded(false);
   }, [generation.id]);
 
   const handlePromptSave = () => {
@@ -77,6 +81,8 @@ export function Details({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const modelInfo = models.find(m => m.id === generation.model);
+
   return (
     <div className="panel details-panel">
       <div className="column-header details-header">
@@ -89,6 +95,7 @@ export function Details({
       </div>
 
       <div className="details-content">
+        {/* Title */}
         <div className="details-title-section">
           {editingTitle ? (
             <input
@@ -111,49 +118,33 @@ export function Details({
           )}
         </div>
 
-        <div className="details-section">
-          <div className="details-row">
-            <span className="details-label">ID</span>
-            <span>{generation.id}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Date</span>
-            <span>{generation.date}</span>
-          </div>
-          <div className="details-row">
-            <span className="details-label">Model</span>
-            <span>{generation.model}</span>
-          </div>
-          {generation.width && generation.height && (
-            <div className="details-row">
-              <span className="details-label">Size</span>
-              <span>{generation.width} × {generation.height}</span>
-            </div>
-          )}
-          {generation.generation_time_seconds && (
-            <div className="details-row">
-              <span className="details-label">Time</span>
-              <span>{generation.generation_time_seconds.toFixed(1)}s</span>
-            </div>
-          )}
-          {generation.cost_estimate_usd && (
-            <div className="details-row">
-              <span className="details-label">Cost</span>
-              <span>${generation.cost_estimate_usd.toFixed(3)}</span>
-            </div>
-          )}
-          <div className="details-row">
-            <span className="details-label">File Size</span>
-            <span>{formatFileSize(generation.file_size)}</span>
-          </div>
-          {generation.seed && (
-            <div className="details-row">
-              <span className="details-label">Seed</span>
-              <span className="text-mono">{generation.seed}</span>
-            </div>
-          )}
+        {/* Model + Star row */}
+        <div className="model-star-row">
+          <span className="model-badge">{modelInfo?.display_name || generation.model}</span>
+          <button
+            className={`star-btn ${generation.starred ? 'starred' : ''}`}
+            onClick={onToggleStar}
+            title={generation.starred ? 'Remove star' : 'Add star'}
+          >
+            {generation.starred ? '★' : '☆'}
+          </button>
         </div>
 
+        {/* References */}
+        {generation.references.length > 0 && (
+          <div className="details-section">
+            <label className="details-label">References</label>
+            <div className="references-grid">
+              {generation.references.map((ref) => (
+                <div key={ref.id} className="reference-thumb" title={ref.path.split('/').pop()}>
+                  <img src={getImageUrl(ref.path)} alt="Reference" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tags */}
         <div className="details-section">
           <label className="details-label">Tags</label>
           <TagChips
@@ -163,33 +154,98 @@ export function Details({
           />
         </div>
 
+        {/* Prompt (collapsible) */}
         <div className="details-section">
-          <label className="details-label">Prompt</label>
-          {editingPrompt ? (
-            <div className="prompt-edit">
-              <textarea
-                value={promptValue}
-                onChange={(e) => setPromptValue(e.target.value)}
-                rows={4}
-              />
-              <div className="prompt-edit-actions">
-                <button className="btn btn-sm btn-secondary" onClick={() => setEditingPrompt(false)}>
-                  Cancel
-                </button>
-                <button className="btn btn-sm btn-primary" onClick={handlePromptSave}>
-                  Save
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="prompt-text" onClick={() => setEditingPrompt(true)}>
-              <Markdown>{generation.prompt}</Markdown>
+          <button
+            className="collapse-header"
+            onClick={() => !editingPrompt && setPromptExpanded(!promptExpanded)}
+          >
+            <span className={`collapse-arrow ${promptExpanded ? 'expanded' : ''}`}>▶</span>
+            <span className="details-label" style={{ marginBottom: 0 }}>Prompt</span>
+          </button>
+          {promptExpanded && (
+            <div className="collapse-content">
+              {editingPrompt ? (
+                <div className="prompt-edit">
+                  <textarea
+                    value={promptValue}
+                    onChange={(e) => setPromptValue(e.target.value)}
+                    rows={6}
+                    autoFocus
+                  />
+                  <div className="prompt-edit-actions">
+                    <button className="btn btn-sm btn-secondary" onClick={() => setEditingPrompt(false)}>
+                      Cancel
+                    </button>
+                    <button className="btn btn-sm btn-primary" onClick={handlePromptSave}>
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="prompt-text" onClick={() => setEditingPrompt(true)}>
+                  <Markdown>{generation.prompt}</Markdown>
+                </div>
+              )}
             </div>
           )}
         </div>
 
+        {/* Metadata (collapsible) */}
         <div className="details-section">
-          <label className="details-label">Regenerate with</label>
+          <button
+            className="collapse-header"
+            onClick={() => setMetadataExpanded(!metadataExpanded)}
+          >
+            <span className={`collapse-arrow ${metadataExpanded ? 'expanded' : ''}`}>▶</span>
+            <span className="details-label" style={{ marginBottom: 0 }}>Metadata</span>
+          </button>
+          {metadataExpanded && (
+            <div className="collapse-content">
+              <div className="metadata-grid">
+                <span className="meta-label">ID</span>
+                <span>{generation.id}</span>
+
+                <span className="meta-label">Date</span>
+                <span>{generation.date}</span>
+
+                {generation.width && generation.height && (
+                  <>
+                    <span className="meta-label">Size</span>
+                    <span>{generation.width} × {generation.height}</span>
+                  </>
+                )}
+
+                {generation.generation_time_seconds && (
+                  <>
+                    <span className="meta-label">Time</span>
+                    <span>{generation.generation_time_seconds.toFixed(1)}s</span>
+                  </>
+                )}
+
+                {generation.cost_estimate_usd && (
+                  <>
+                    <span className="meta-label">Cost</span>
+                    <span>${generation.cost_estimate_usd.toFixed(3)}</span>
+                  </>
+                )}
+
+                <span className="meta-label">File</span>
+                <span>{formatFileSize(generation.file_size)}</span>
+
+                {generation.seed && (
+                  <>
+                    <span className="meta-label">Seed</span>
+                    <span className="text-mono">{generation.seed}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Actions (bottom) */}
+        <div className="details-actions">
           <div className="regenerate-form">
             <select
               value={selectedModel}
@@ -208,16 +264,7 @@ export function Details({
               Regenerate
             </button>
           </div>
-        </div>
-
-        <div className="details-actions">
-          <button
-            className={`btn btn-secondary ${generation.starred ? 'starred' : ''}`}
-            onClick={onToggleStar}
-          >
-            {generation.starred ? '★ Starred' : '☆ Star'}
-          </button>
-          <button className="btn btn-secondary btn-danger" onClick={() => setShowTrashConfirm(true)}>
+          <button className="btn btn-ghost btn-danger-text" onClick={() => setShowTrashConfirm(true)}>
             Trash
           </button>
         </div>
@@ -267,8 +314,10 @@ export function Details({
           overflow-y: auto;
           flex: 1;
         }
+
+        /* Title */
         .details-title-section {
-          margin-bottom: var(--spacing-md);
+          margin-bottom: var(--spacing-sm);
         }
         .title-display {
           font-size: 18px;
@@ -300,14 +349,40 @@ export function Details({
           outline: none;
           box-shadow: 0 0 0 2px var(--accent-muted);
         }
-        .details-section {
-          margin-bottom: var(--spacing-lg);
-        }
-        .details-row {
+
+        /* Model + Star row */
+        .model-star-row {
           display: flex;
+          align-items: center;
           justify-content: space-between;
-          padding: var(--spacing-xs) 0;
-          border-bottom: 1px solid var(--border);
+          margin-bottom: var(--spacing-md);
+        }
+        .model-badge {
+          font-size: 13px;
+          color: var(--text-secondary);
+          background: var(--bg-primary);
+          padding: var(--spacing-xs) var(--spacing-sm);
+          border-radius: var(--radius-sm);
+        }
+        .star-btn {
+          background: none;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          color: var(--text-muted);
+          padding: var(--spacing-xs);
+          transition: color var(--transition-fast), transform var(--transition-fast);
+        }
+        .star-btn:hover {
+          transform: scale(1.1);
+        }
+        .star-btn.starred {
+          color: var(--warning);
+        }
+
+        /* Sections */
+        .details-section {
+          margin-bottom: var(--spacing-md);
         }
         .details-label {
           color: var(--text-secondary);
@@ -317,13 +392,74 @@ export function Details({
           display: block;
           margin-bottom: var(--spacing-xs);
         }
-        .details-row .details-label {
-          margin-bottom: 0;
+
+        /* Collapsible sections */
+        .collapse-header {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-xs);
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: var(--spacing-xs) 0;
+          width: 100%;
+          text-align: left;
+        }
+        .collapse-header:hover .details-label {
+          color: var(--text-primary);
+        }
+        .collapse-arrow {
+          font-size: 10px;
+          color: var(--text-muted);
+          transition: transform var(--transition-fast);
+        }
+        .collapse-arrow.expanded {
+          transform: rotate(90deg);
+        }
+        .collapse-content {
+          margin-top: var(--spacing-sm);
+        }
+
+        /* Metadata grid */
+        .metadata-grid {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          gap: var(--spacing-xs) var(--spacing-md);
+          font-size: 13px;
+        }
+        .meta-label {
+          color: var(--text-muted);
         }
         .text-mono {
           font-family: var(--font-mono);
           font-size: 12px;
         }
+
+        /* References */
+        .references-grid {
+          display: flex;
+          gap: var(--spacing-sm);
+          flex-wrap: wrap;
+        }
+        .reference-thumb {
+          width: 60px;
+          height: 60px;
+          border-radius: var(--radius-sm);
+          overflow: hidden;
+          cursor: pointer;
+          border: 1px solid var(--border);
+          transition: border-color var(--transition-fast);
+        }
+        .reference-thumb:hover {
+          border-color: var(--accent);
+        }
+        .reference-thumb img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        /* Prompt */
         .prompt-text {
           background: var(--bg-primary);
           padding: var(--spacing-sm);
@@ -383,30 +519,31 @@ export function Details({
           gap: var(--spacing-sm);
           justify-content: flex-end;
         }
+
+        /* Actions */
+        .details-actions {
+          margin-top: auto;
+          padding-top: var(--spacing-md);
+          border-top: 1px solid var(--border);
+        }
         .regenerate-form {
           display: flex;
           gap: var(--spacing-sm);
+          margin-bottom: var(--spacing-sm);
         }
         .regenerate-form select {
           flex: 1;
         }
-        .details-actions {
-          display: flex;
-          gap: var(--spacing-sm);
-          padding-top: var(--spacing-md);
-          border-top: 1px solid var(--border);
+        .btn-danger-text {
+          color: var(--text-muted);
+          width: 100%;
         }
-        .details-actions .btn {
-          flex: 1;
+        .btn-danger-text:hover {
+          color: var(--error);
+          background: var(--bg-hover);
         }
-        .btn-danger:hover {
-          background: var(--error);
-          border-color: var(--error);
-          color: white;
-        }
-        .starred {
-          color: var(--warning);
-        }
+
+        /* Confirm dialog */
         .confirm-overlay {
           position: fixed;
           inset: 0;

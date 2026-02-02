@@ -40,6 +40,7 @@ pub fn run() {
             commands::list_models,
             commands::get_cost_summary,
             commands::get_image_path,
+            commands::get_references,
         ])
         .setup(|app| {
             // Start file watcher for auto-refresh
