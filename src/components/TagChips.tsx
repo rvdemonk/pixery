@@ -63,6 +63,9 @@ export function TagChips({ tags, onAdd, onRemove, editable = true }: TagChipsPro
           onKeyDown={handleKeyDown}
           onBlur={handleSubmit}
           placeholder="Tag name"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
         />
       )}
       <style>{`

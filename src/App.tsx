@@ -174,7 +174,7 @@ export default function App() {
   }, [selectedGeneration]);
 
   // Generate from remix modal
-  const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[]) => {
+  const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[], tags: string[]) => {
     if (!selectedGeneration) return;
     // Close modals immediately
     setRemixOpen(false);
@@ -183,7 +183,7 @@ export default function App() {
     const result = await generate({
       prompt,
       model,
-      tags: selectedGeneration.tags,
+      tags,
       reference_paths: referencePaths,
       copy_to: null,
     });

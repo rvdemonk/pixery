@@ -7,7 +7,7 @@ interface RemixModalProps {
   models: ModelInfo[];
   references: Reference[];
   onClose: () => void;
-  onGenerate: (prompt: string, model: string, referencePaths: string[]) => void;
+  onGenerate: (prompt: string, model: string, referencePaths: string[], tags: string[]) => void;
   onAddReference: () => void;
   onRemoveReference: (refId: number) => void;
 }
@@ -23,16 +23,22 @@ export function RemixModal({
 }: RemixModalProps) {
   const [prompt, setPrompt] = useState(generation.prompt);
   const [selectedModel, setSelectedModel] = useState(generation.model);
+  const [tagsInput, setTagsInput] = useState(generation.tags.join(', '));
 
   // Reset local state when generation changes
   useEffect(() => {
     setPrompt(generation.prompt);
     setSelectedModel(generation.model);
+    setTagsInput(generation.tags.join(', '));
   }, [generation.id]);
 
   const handleGenerate = () => {
     const referencePaths = references.map((ref) => ref.path);
-    onGenerate(prompt, selectedModel, referencePaths);
+    const tags = tagsInput
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    onGenerate(prompt, selectedModel, referencePaths, tags);
   };
 
   return (
@@ -94,6 +100,21 @@ export function RemixModal({
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Tags input */}
+            <div className="remix-section">
+              <label className="remix-label">Tags</label>
+              <input
+                type="text"
+                className="remix-tags-input"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="tag1, tag2, ..."
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+              />
             </div>
 
             {/* Prompt textarea */}
@@ -307,6 +328,13 @@ export function RemixModal({
         }
 
         .remix-select {
+          width: 100%;
+          min-height: 44px;
+          font-size: 15px;
+          padding: var(--spacing-sm) var(--spacing-md);
+        }
+
+        .remix-tags-input {
           width: 100%;
           min-height: 44px;
           font-size: 15px;
