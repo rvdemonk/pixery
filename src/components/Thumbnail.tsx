@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Generation } from '../lib/types';
 import { getImageUrl } from '../lib/api';
 
@@ -9,7 +10,7 @@ interface ThumbnailProps {
   onContextMenu: (e: React.MouseEvent) => void;
 }
 
-export function Thumbnail({ generation, selected, onClick, onDoubleClick, onContextMenu }: ThumbnailProps) {
+export const Thumbnail = memo(function Thumbnail({ generation, selected, onClick, onDoubleClick, onContextMenu }: ThumbnailProps) {
   const imageSrc = generation.thumb_path
     ? getImageUrl(generation.thumb_path)
     : getImageUrl(generation.image_path);
@@ -74,4 +75,4 @@ export function Thumbnail({ generation, selected, onClick, onDoubleClick, onCont
       `}</style>
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback, memo } from 'react';
 import type { Generation } from '../lib/types';
 import { Thumbnail } from './Thumbnail';
 
@@ -11,7 +11,41 @@ interface GalleryProps {
   loading: boolean;
 }
 
-export function Gallery({ generations, selectedId, onSelect, onDoubleClick, onContextMenu, loading }: GalleryProps) {
+/**
+ * Wrapper component that provides stable callbacks for each thumbnail
+ */
+const ThumbnailWrapper = memo(function ThumbnailWrapper({
+  generation,
+  selected,
+  onSelect,
+  onDoubleClick,
+  onContextMenu,
+}: {
+  generation: Generation;
+  selected: boolean;
+  onSelect: (id: number) => void;
+  onDoubleClick: (id: number) => void;
+  onContextMenu: (generation: Generation, position: { x: number; y: number }) => void;
+}) {
+  const handleClick = useCallback(() => onSelect(generation.id), [onSelect, generation.id]);
+  const handleDoubleClick = useCallback(() => onDoubleClick(generation.id), [onDoubleClick, generation.id]);
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    onContextMenu(generation, { x: e.clientX, y: e.clientY });
+  }, [onContextMenu, generation]);
+
+  return (
+    <Thumbnail
+      generation={generation}
+      selected={selected}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
+    />
+  );
+});
+
+export const Gallery = memo(function Gallery({ generations, selectedId, onSelect, onDoubleClick, onContextMenu, loading }: GalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Scroll selected item into view
@@ -43,15 +77,12 @@ export function Gallery({ generations, selectedId, onSelect, onDoubleClick, onCo
     <div className="gallery" ref={containerRef}>
       {generations.map((gen) => (
         <div key={gen.id} data-id={gen.id}>
-          <Thumbnail
+          <ThumbnailWrapper
             generation={gen}
             selected={gen.id === selectedId}
-            onClick={() => onSelect(gen.id)}
-            onDoubleClick={() => onDoubleClick(gen.id)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onContextMenu(gen, { x: e.clientX, y: e.clientY });
-            }}
+            onSelect={onSelect}
+            onDoubleClick={onDoubleClick}
+            onContextMenu={onContextMenu}
           />
         </div>
       ))}
@@ -68,4 +99,4 @@ export function Gallery({ generations, selectedId, onSelect, onDoubleClick, onCo
       `}</style>
     </div>
   );
-}
+});

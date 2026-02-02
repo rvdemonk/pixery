@@ -15,6 +15,43 @@ interface UseGenerationsResult {
   search: (query: string) => Promise<void>;
 }
 
+/**
+ * Merge new generations with existing ones, preserving object references
+ * for unchanged items to prevent unnecessary re-renders.
+ */
+function mergeGenerations(existing: Generation[], incoming: Generation[]): Generation[] {
+  if (existing.length === 0) return incoming;
+
+  const existingMap = new Map(existing.map(g => [g.id, g]));
+  const result: Generation[] = [];
+
+  for (const newGen of incoming) {
+    const existingGen = existingMap.get(newGen.id);
+    if (existingGen && !hasGenerationChanged(existingGen, newGen)) {
+      // Reuse existing object reference if unchanged
+      result.push(existingGen);
+    } else {
+      result.push(newGen);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Check if a generation has meaningfully changed (ignoring reference equality)
+ */
+function hasGenerationChanged(a: Generation, b: Generation): boolean {
+  return (
+    a.starred !== b.starred ||
+    a.prompt !== b.prompt ||
+    a.title !== b.title ||
+    a.trashed_at !== b.trashed_at ||
+    a.tags.length !== b.tags.length ||
+    a.tags.some((tag, i) => tag !== b.tags[i])
+  );
+}
+
 export function useGenerations(options: UseGenerationsOptions = {}): UseGenerationsResult {
   const { filter = {}, autoRefresh = false } = options;
   const [generations, setGenerations] = useState<Generation[]>([]);
@@ -30,7 +67,8 @@ export function useGenerations(options: UseGenerationsOptions = {}): UseGenerati
       }
       setError(null);
       const data = await api.listGenerations(filter);
-      setGenerations(data);
+      // Merge instead of replace to preserve object references
+      setGenerations(prev => mergeGenerations(prev, data));
       isInitialLoad.current = false;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load generations');

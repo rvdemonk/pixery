@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import Markdown from 'react-markdown';
 import type { Generation, ModelInfo } from '../lib/types';
 import { getImageUrl } from '../lib/api';
@@ -17,7 +17,7 @@ interface DetailsProps {
   onTrash: () => void;
 }
 
-export function Details({
+export const Details = memo(function Details({
   generation,
   models,
   onClose,
@@ -595,4 +595,4 @@ export function Details({
       `}</style>
     </div>
   );
-}
+});
