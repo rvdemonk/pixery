@@ -207,3 +207,84 @@ pub struct GenerationResult {
     pub seed: Option<String>,
     pub generation_time_seconds: f64,
 }
+
+/// Job status for generation tracking
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JobStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+}
+
+impl std::fmt::Display for JobStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobStatus::Pending => write!(f, "pending"),
+            JobStatus::Running => write!(f, "running"),
+            JobStatus::Completed => write!(f, "completed"),
+            JobStatus::Failed => write!(f, "failed"),
+        }
+    }
+}
+
+impl std::str::FromStr for JobStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "pending" => Ok(JobStatus::Pending),
+            "running" => Ok(JobStatus::Running),
+            "completed" => Ok(JobStatus::Completed),
+            "failed" => Ok(JobStatus::Failed),
+            _ => Err(format!("Unknown job status: {}", s)),
+        }
+    }
+}
+
+/// Source of a generation job
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JobSource {
+    Cli,
+    Gui,
+}
+
+impl std::fmt::Display for JobSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobSource::Cli => write!(f, "cli"),
+            JobSource::Gui => write!(f, "gui"),
+        }
+    }
+}
+
+impl std::str::FromStr for JobSource {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "cli" => Ok(JobSource::Cli),
+            "gui" => Ok(JobSource::Gui),
+            _ => Err(format!("Unknown job source: {}", s)),
+        }
+    }
+}
+
+/// A generation job record for tracking in-flight generations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Job {
+    pub id: i64,
+    pub status: JobStatus,
+    pub model: String,
+    pub prompt: String,
+    pub tags: Option<Vec<String>>,
+    pub source: JobSource,
+    pub ref_count: i32,
+    pub created_at: String,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+    pub generation_id: Option<i64>,
+    pub error: Option<String>,
+}

@@ -41,6 +41,7 @@ pub fn run() {
             commands::get_cost_summary,
             commands::get_image_path,
             commands::get_references,
+            commands::list_jobs,
         ])
         .setup(|app| {
             // Start file watcher for auto-refresh

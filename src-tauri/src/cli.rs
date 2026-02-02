@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use crate::archive;
 use crate::db::Database;
-use crate::models::{ListFilter, ModelInfo};
+use crate::models::{JobSource, ListFilter, ModelInfo};
 use crate::providers;
 
 #[derive(Subcommand, Clone)]
@@ -508,10 +508,23 @@ async fn generate_image(
         .map(|m| m.provider.to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
+    // Create job to track this generation
+    let tags_opt = if tags.is_empty() { None } else { Some(tags) };
+    let job_id = db.create_job(model, prompt, tags_opt, JobSource::Cli, reference_paths.len() as i32)?;
+
+    // Mark job as running
+    db.update_job_started(job_id)?;
+
     println!("Generating with {}...", model);
 
     // Generate image
-    let result = providers::generate(model, prompt, reference_paths).await?;
+    let result = match providers::generate(model, prompt, reference_paths).await {
+        Ok(r) => r,
+        Err(e) => {
+            db.update_job_failed(job_id, &e.to_string())?;
+            return Err(e);
+        }
+    };
 
     // Save to archive
     let now = Local::now();
@@ -552,6 +565,9 @@ async fn generate_image(
         let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap())?;
         db.link_reference(gen_id, ref_id)?;
     }
+
+    // Mark job as completed
+    db.update_job_completed(job_id, gen_id)?;
 
     // Copy to destination if requested
     if let Some(dest) = copy_to {

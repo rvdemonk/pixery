@@ -66,3 +66,21 @@ export interface Reference {
   path: string;
   created_at: string;
 }
+
+export type JobStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type JobSource = 'cli' | 'gui';
+
+export interface Job {
+  id: number;
+  status: JobStatus;
+  model: string;
+  prompt: string;
+  tags: string[] | null;
+  source: JobSource;
+  ref_count: number;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  generation_id: number | null;
+  error: string | null;
+}

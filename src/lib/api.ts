@@ -7,6 +7,7 @@ import type {
   ModelInfo,
   CostSummary,
   Reference,
+  Job,
 } from './types';
 
 export async function generateImage(params: GenerateParams): Promise<Generation> {
@@ -76,4 +77,8 @@ export async function getReferences(id: number): Promise<Reference[]> {
 export function getImageUrl(path: string): string {
   // Use Tauri's convertFileSrc to load local files
   return convertFileSrc(path);
+}
+
+export async function listJobs(): Promise<Job[]> {
+  return invoke('list_jobs');
 }

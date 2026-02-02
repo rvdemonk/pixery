@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Generation, ListFilter } from '../lib/types';
 import * as api from '../lib/api';
 
@@ -20,13 +20,18 @@ export function useGenerations(options: UseGenerationsOptions = {}): UseGenerati
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isInitialLoad = useRef(true);
 
   const fetchGenerations = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load, not on refresh
+      if (isInitialLoad.current) {
+        setLoading(true);
+      }
       setError(null);
       const data = await api.listGenerations(filter);
       setGenerations(data);
+      isInitialLoad.current = false;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load generations');
     } finally {

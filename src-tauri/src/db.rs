@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 
-use crate::models::{CostSummary, Generation, ListFilter, Reference, TagCount};
+use crate::models::{CostSummary, Generation, Job, JobSource, JobStatus, ListFilter, Reference, TagCount};
 
 const SCHEMA: &str = r#"
 -- Core generations table
@@ -61,6 +61,24 @@ CREATE INDEX IF NOT EXISTS idx_gen_starred ON generations(starred);
 CREATE INDEX IF NOT EXISTS idx_gen_parent ON generations(parent_id);
 CREATE INDEX IF NOT EXISTS idx_gen_date ON generations(date);
 CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
+
+-- Generation jobs for tracking in-flight generations
+CREATE TABLE IF NOT EXISTS generation_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    model TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    tags TEXT,
+    source TEXT NOT NULL,
+    ref_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    started_at TEXT,
+    completed_at TEXT,
+    generation_id INTEGER REFERENCES generations(id),
+    error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON generation_jobs(status);
 "#;
 
 pub struct Database {
@@ -576,5 +594,98 @@ impl Database {
             by_day,
             count,
         })
+    }
+
+    // Job operations
+
+    pub fn create_job(
+        &self,
+        model: &str,
+        prompt: &str,
+        tags: Option<&[String]>,
+        source: JobSource,
+        ref_count: i32,
+    ) -> Result<i64> {
+        let tags_json = tags.map(|t| serde_json::to_string(t).unwrap_or_default());
+        self.conn.execute(
+            "INSERT INTO generation_jobs (model, prompt, tags, source, ref_count) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![model, prompt, tags_json, source.to_string(), ref_count],
+        ).context("Failed to create job")?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn update_job_started(&self, id: i64) -> Result<()> {
+        let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+        self.conn.execute(
+            "UPDATE generation_jobs SET status = 'running', started_at = ?1 WHERE id = ?2",
+            params![now, id],
+        ).context("Failed to update job to running")?;
+        Ok(())
+    }
+
+    pub fn update_job_completed(&self, id: i64, generation_id: i64) -> Result<()> {
+        let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+        self.conn.execute(
+            "UPDATE generation_jobs SET status = 'completed', completed_at = ?1, generation_id = ?2 WHERE id = ?3",
+            params![now, generation_id, id],
+        ).context("Failed to update job to completed")?;
+        Ok(())
+    }
+
+    pub fn update_job_failed(&self, id: i64, error: &str) -> Result<()> {
+        let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+        self.conn.execute(
+            "UPDATE generation_jobs SET status = 'failed', completed_at = ?1, error = ?2 WHERE id = ?3",
+            params![now, error, id],
+        ).context("Failed to update job to failed")?;
+        Ok(())
+    }
+
+    pub fn list_active_jobs(&self) -> Result<Vec<Job>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, status, model, prompt, tags, source, ref_count, created_at, started_at, completed_at, generation_id, error
+             FROM generation_jobs
+             WHERE status IN ('pending', 'running')
+             ORDER BY created_at DESC",
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            let status_str: String = row.get(1)?;
+            let source_str: String = row.get(5)?;
+            let tags_json: Option<String> = row.get(4)?;
+
+            Ok(Job {
+                id: row.get(0)?,
+                status: status_str.parse().unwrap_or(JobStatus::Pending),
+                model: row.get(2)?,
+                prompt: row.get(3)?,
+                tags: tags_json.and_then(|s| serde_json::from_str(&s).ok()),
+                source: source_str.parse().unwrap_or(JobSource::Cli),
+                ref_count: row.get(6)?,
+                created_at: row.get(7)?,
+                started_at: row.get(8)?,
+                completed_at: row.get(9)?,
+                generation_id: row.get(10)?,
+                error: row.get(11)?,
+            })
+        })?;
+
+        let mut jobs = vec![];
+        for row in rows {
+            jobs.push(row?);
+        }
+        Ok(jobs)
+    }
+
+    pub fn cleanup_old_jobs(&self, hours: i64) -> Result<usize> {
+        let cutoff = chrono::Local::now() - chrono::Duration::hours(hours);
+        let cutoff_str = cutoff.format("%Y-%m-%dT%H:%M:%S").to_string();
+
+        let count = self.conn.execute(
+            "DELETE FROM generation_jobs WHERE status IN ('completed', 'failed') AND completed_at < ?1",
+            params![cutoff_str],
+        ).context("Failed to cleanup old jobs")?;
+
+        Ok(count)
     }
 }

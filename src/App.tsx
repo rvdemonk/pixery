@@ -6,6 +6,7 @@ import { useGenerations } from './hooks/useGenerations';
 import { useTags } from './hooks/useTags';
 import { useKeyboard } from './hooks/useKeyboard';
 import { useGenerate } from './hooks/useGenerate';
+import { useJobs } from './hooks/useJobs';
 import { Sidebar } from './components/Sidebar';
 import { Gallery } from './components/Gallery';
 import { Details } from './components/Details';
@@ -15,6 +16,7 @@ import { Dashboard } from './components/Dashboard';
 import { Cheatsheet } from './components/Cheatsheet';
 import { ContextMenu } from './components/ContextMenu';
 import { Lightbox } from './components/Lightbox';
+import { JobsIndicator } from './components/JobsIndicator';
 
 type View = 'gallery' | 'compare' | 'dashboard';
 
@@ -47,6 +49,7 @@ export default function App() {
   const { generations, loading, refresh, search } = useGenerations({ filter });
   const { tags, addTags, removeTag, refresh: refreshTags } = useTags();
   const { generating, error: generateError, generate } = useGenerate();
+  const { jobs, activeCount } = useJobs();
 
   // Load models on mount
   useEffect(() => {
@@ -266,6 +269,7 @@ export default function App() {
               onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
+          <JobsIndicator jobs={jobs} activeCount={activeCount} />
           <button
             className="btn btn-primary"
             onClick={() => setGenerateOpen(!generateOpen)}

@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::archive;
 use crate::db::Database;
-use crate::models::{CostSummary, Generation, GenerateParams, ListFilter, ModelInfo, Reference, TagCount};
+use crate::models::{CostSummary, Generation, GenerateParams, Job, JobSource, ListFilter, ModelInfo, Reference, TagCount};
 use crate::providers;
 
 pub struct AppState {
@@ -27,10 +27,25 @@ pub async fn generate_image(
         .map(|m| m.provider.to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
+    // Create job to track this generation
+    let job_id = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let tags_opt = if params.tags.is_empty() { None } else { Some(params.tags.as_slice()) };
+        let job_id = db.create_job(model, prompt, tags_opt, JobSource::Gui, reference_paths.len() as i32)
+            .map_err(|e| e.to_string())?;
+        db.update_job_started(job_id).map_err(|e| e.to_string())?;
+        job_id
+    };
+
     // Generate image
-    let result = providers::generate(model, prompt, reference_paths)
-        .await
-        .map_err(|e| e.to_string())?;
+    let result = match providers::generate(model, prompt, reference_paths).await {
+        Ok(r) => r,
+        Err(e) => {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            let _ = db.update_job_failed(job_id, &e.to_string());
+            return Err(e.to_string());
+        }
+    };
 
     // Save to archive
     let now = chrono::Local::now();
@@ -79,6 +94,9 @@ pub async fn generate_image(
             .map_err(|e| e.to_string())?;
         db.link_reference(gen_id, ref_id).map_err(|e| e.to_string())?;
     }
+
+    // Mark job as completed
+    db.update_job_completed(job_id, gen_id).map_err(|e| e.to_string())?;
 
     // Copy to destination if requested
     if let Some(ref dest) = params.copy_to {
@@ -201,4 +219,10 @@ pub fn get_image_path(path: String) -> String {
 pub fn get_references(state: State<'_, AppState>, id: i64) -> Result<Vec<Reference>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.get_references_for_generation(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_jobs(state: State<'_, AppState>) -> Result<Vec<Job>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.list_active_jobs().map_err(|e| e.to_string())
 }
