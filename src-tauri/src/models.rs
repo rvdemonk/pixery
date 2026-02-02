@@ -7,6 +7,7 @@ pub enum Provider {
     Gemini,
     Fal,
     OpenAI,
+    SelfHosted,
 }
 
 impl std::fmt::Display for Provider {
@@ -15,6 +16,7 @@ impl std::fmt::Display for Provider {
             Provider::Gemini => write!(f, "gemini"),
             Provider::Fal => write!(f, "fal"),
             Provider::OpenAI => write!(f, "openai"),
+            Provider::SelfHosted => write!(f, "selfhosted"),
         }
     }
 }
@@ -27,6 +29,7 @@ impl std::str::FromStr for Provider {
             "gemini" => Ok(Provider::Gemini),
             "fal" => Ok(Provider::Fal),
             "openai" => Ok(Provider::OpenAI),
+            "selfhosted" => Ok(Provider::SelfHosted),
             _ => Err(format!("Unknown provider: {}", s)),
         }
     }
@@ -206,6 +209,8 @@ pub struct GenerationResult {
     pub image_data: Vec<u8>,
     pub seed: Option<String>,
     pub generation_time_seconds: f64,
+    /// Actual cost from API (token-based), if available. Takes precedence over estimate.
+    pub cost_usd: Option<f64>,
 }
 
 /// Job status for generation tracking

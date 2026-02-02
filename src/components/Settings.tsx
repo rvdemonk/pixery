@@ -1,17 +1,62 @@
-import { useState } from 'react';
-import type { TagCount } from '../lib/types';
+import { useState, useEffect } from 'react';
+import type { TagCount, SelfHostedStatus } from '../lib/types';
+import * as api from '../lib/api';
 
 interface SettingsProps {
   tags: TagCount[];
   hiddenTags: string[];
   onToggleHiddenTag: (tag: string) => void;
   onClose: () => void;
+  onSelfHostedChange?: () => void;
 }
 
-type SettingsSection = 'hidden-tags' | null;
+type SettingsSection = 'hidden-tags' | 'selfhosted' | null;
 
-export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose }: SettingsProps) {
+export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfHostedChange }: SettingsProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>(null);
+
+  // Self-hosted server state
+  const [serverUrl, setServerUrl] = useState('');
+  const [serverStatus, setServerStatus] = useState<SelfHostedStatus | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Load current server URL on mount
+  useEffect(() => {
+    api.getSelfhostedUrl().then((url) => {
+      if (url) setServerUrl(url);
+    });
+    // Also check current health status
+    api.checkSelfhostedHealth().then(setServerStatus);
+  }, []);
+
+  const handleTestConnection = async () => {
+    if (!serverUrl.trim()) return;
+    setTesting(true);
+    // Temporarily save URL to test it
+    await api.setSelfhostedUrl(serverUrl.trim());
+    const status = await api.checkSelfhostedHealth();
+    setServerStatus(status);
+    setTesting(false);
+  };
+
+  const handleSaveUrl = async () => {
+    setSaving(true);
+    await api.setSelfhostedUrl(serverUrl.trim() || null);
+    const status = await api.checkSelfhostedHealth();
+    setServerStatus(status);
+    setSaving(false);
+    onSelfHostedChange?.();
+  };
+
+  const handleClearUrl = async () => {
+    setSaving(true);
+    setServerUrl('');
+    await api.setSelfhostedUrl(null);
+    setServerStatus(null);
+    setSaving(false);
+    onSelfHostedChange?.();
+  };
 
   const visibleTags = tags.filter((t) => !hiddenTags.includes(t.name));
   const hiddenTagsList = tags.filter((t) => hiddenTags.includes(t.name));
@@ -27,7 +72,10 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose }: Setti
                   <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </button>
-              <h2>{activeSection === 'hidden-tags' ? 'Hidden Tags' : 'Settings'}</h2>
+              <h2>
+                {activeSection === 'hidden-tags' && 'Hidden Tags'}
+                {activeSection === 'selfhosted' && 'Self-Hosted Server'}
+              </h2>
             </>
           ) : (
             <h2>Settings</h2>
@@ -38,6 +86,26 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose }: Setti
         <div className="settings-content">
           {activeSection === null && (
             <div className="settings-menu">
+              <button
+                className="settings-menu-item"
+                onClick={() => setActiveSection('selfhosted')}
+              >
+                <div className="settings-menu-item-content">
+                  <span className="settings-menu-item-label">Self-Hosted Server</span>
+                  <span className="settings-menu-item-value">
+                    {serverStatus?.connected ? (
+                      <span className="status-connected">Connected</span>
+                    ) : serverUrl ? (
+                      <span className="status-offline">Offline</span>
+                    ) : (
+                      'Not configured'
+                    )}
+                  </span>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
               <button
                 className="settings-menu-item"
                 onClick={() => setActiveSection('hidden-tags')}
@@ -52,6 +120,88 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose }: Setti
                   <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                 </svg>
               </button>
+            </div>
+          )}
+
+          {activeSection === 'selfhosted' && (
+            <div className="settings-section">
+              <p className="settings-description">
+                Connect to a self-hosted inference server for local image generation.
+              </p>
+
+              <div className="settings-field">
+                <label htmlFor="server-url">Server URL</label>
+                <input
+                  id="server-url"
+                  type="text"
+                  value={serverUrl}
+                  onChange={(e) => setServerUrl(e.target.value)}
+                  placeholder="http://192.168.1.50:8000"
+                  className="settings-input"
+                />
+              </div>
+
+              <div className="settings-actions">
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleTestConnection}
+                  disabled={!serverUrl.trim() || testing}
+                >
+                  {testing ? 'Testing...' : 'Test Connection'}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveUrl}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                {serverUrl && (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={handleClearUrl}
+                    disabled={saving}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {serverStatus && (
+                <div className={`settings-status ${serverStatus.connected ? 'status-ok' : 'status-error'}`}>
+                  <div className="status-header">
+                    <span className={`status-dot ${serverStatus.connected ? 'dot-connected' : 'dot-offline'}`} />
+                    <span>{serverStatus.connected ? 'Connected' : 'Connection Failed'}</span>
+                  </div>
+                  {serverStatus.connected && (
+                    <div className="status-details">
+                      {serverStatus.gpu_name && (
+                        <div className="status-row">
+                          <span className="status-label">GPU</span>
+                          <span className="status-value">{serverStatus.gpu_name}</span>
+                        </div>
+                      )}
+                      {serverStatus.current_model && (
+                        <div className="status-row">
+                          <span className="status-label">Current Model</span>
+                          <span className="status-value">{serverStatus.current_model}</span>
+                        </div>
+                      )}
+                      {serverStatus.available_models.length > 0 && (
+                        <div className="status-row">
+                          <span className="status-label">Available</span>
+                          <span className="status-value">
+                            {serverStatus.available_models.join(', ')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {serverStatus.error && (
+                    <div className="status-error-message">{serverStatus.error}</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -258,6 +408,93 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose }: Setti
           color: var(--text-muted);
           font-size: 13px;
           text-align: center;
+        }
+        /* Self-hosted server styles */
+        .status-connected {
+          color: var(--success, #4ade80);
+        }
+        .status-offline {
+          color: var(--warning, #fbbf24);
+        }
+        .settings-field {
+          margin-bottom: var(--spacing-md);
+        }
+        .settings-field label {
+          display: block;
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--text-muted);
+          margin-bottom: var(--spacing-xs);
+        }
+        .settings-input {
+          width: 100%;
+          padding: var(--spacing-sm) var(--spacing-md);
+          background: var(--bg-primary);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          color: var(--text-primary);
+          font-size: 14px;
+          font-family: monospace;
+        }
+        .settings-input:focus {
+          outline: none;
+          border-color: var(--accent);
+        }
+        .settings-actions {
+          display: flex;
+          gap: var(--spacing-sm);
+          margin-bottom: var(--spacing-lg);
+        }
+        .settings-status {
+          padding: var(--spacing-md);
+          border-radius: var(--radius-md);
+          background: var(--bg-primary);
+        }
+        .settings-status.status-ok {
+          border-left: 3px solid var(--success, #4ade80);
+        }
+        .settings-status.status-error {
+          border-left: 3px solid var(--error, #f87171);
+        }
+        .status-header {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-sm);
+          font-weight: 500;
+          margin-bottom: var(--spacing-sm);
+        }
+        .status-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+        .dot-connected {
+          background: var(--success, #4ade80);
+        }
+        .dot-offline {
+          background: var(--error, #f87171);
+        }
+        .status-details {
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-xs);
+        }
+        .status-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+        }
+        .status-label {
+          color: var(--text-muted);
+        }
+        .status-value {
+          color: var(--text-secondary);
+        }
+        .status-error-message {
+          margin-top: var(--spacing-sm);
+          font-size: 12px;
+          color: var(--error, #f87171);
+          word-break: break-word;
         }
       `}</style>
     </div>

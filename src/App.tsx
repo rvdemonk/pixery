@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import type { Generation, ModelInfo, ListFilter } from './lib/types';
+import type { Generation, ModelInfo, ListFilter, SelfHostedStatus } from './lib/types';
 import * as api from './lib/api';
 import { useGenerations } from './hooks/useGenerations';
 import { useTags } from './hooks/useTags';
@@ -11,7 +11,7 @@ import { useSettings } from './hooks/useSettings';
 import { Sidebar } from './components/Sidebar';
 import { Gallery } from './components/Gallery';
 import { Details } from './components/Details';
-import { GenerateForm } from './components/GenerateForm';
+import { GenerateModal } from './components/GenerateModal';
 import { Compare } from './components/Compare';
 import { Dashboard } from './components/Dashboard';
 import { Cheatsheet } from './components/Cheatsheet';
@@ -55,13 +55,37 @@ export default function App() {
   const [remixReferences, setRemixReferences] = useState<Reference[]>([]);
 
   // Models
-  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [cloudModels, setCloudModels] = useState<ModelInfo[]>([]);
+  const [selfHostedStatus, setSelfHostedStatus] = useState<SelfHostedStatus | null>(null);
+
+  // Combined model list: self-hosted first (if connected), then cloud
+  const models = useMemo(() => {
+    const result: ModelInfo[] = [];
+
+    // Add self-hosted models at top if server is connected
+    if (selfHostedStatus?.connected && selfHostedStatus.available_models.length > 0) {
+      for (const modelId of selfHostedStatus.available_models) {
+        result.push({
+          id: modelId,
+          provider: 'selfhosted',
+          display_name: `${modelId} (Local)`,
+          cost_per_image: 0,
+          max_refs: 1,
+        });
+      }
+    }
+
+    // Add cloud models
+    result.push(...cloudModels);
+
+    return result;
+  }, [cloudModels, selfHostedStatus]);
 
   // Hooks
   const { generations: allGenerations, loading, refresh, search } = useGenerations({ filter });
   const { tags: allTags, addTags, removeTag, refresh: refreshTags } = useTags();
   const { generating, error: generateError, generate } = useGenerate();
-  const { jobs, activeCount } = useJobs();
+  const { jobs, activeCount, failedJobs, failedCount, dismissFailedJob } = useJobs();
   const { hiddenTags, toggleHiddenTag } = useSettings();
 
   // Filter out hidden tags
@@ -76,7 +100,14 @@ export default function App() {
 
   // Load models on mount
   useEffect(() => {
-    api.listModels().then(setModels);
+    api.listModels().then(setCloudModels);
+    // Check self-hosted server status (non-blocking)
+    api.checkSelfhostedHealth().then(setSelfHostedStatus);
+  }, []);
+
+  // Refresh self-hosted status (called when settings change)
+  const refreshSelfHostedStatus = useCallback(() => {
+    api.checkSelfhostedHealth().then(setSelfHostedStatus);
   }, []);
 
   // Listen for new generations from CLI/external sources
@@ -240,19 +271,19 @@ export default function App() {
     refresh();
   }, [selectedId, refresh]);
 
-  const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[]) => {
+  const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[], referencePaths: string[]) => {
+    setGenerateOpen(false);
     const result = await generate({
       prompt,
       model,
       tags: genTags,
-      reference_paths: [],
+      reference_paths: referencePaths,
       copy_to: null,
     });
     if (result) {
       refresh();
       refreshTags();
       setSelectedId(result.id);
-      setGenerateOpen(false);
     }
   }, [generate, refresh, refreshTags]);
 
@@ -330,24 +361,20 @@ export default function App() {
               onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
-          <JobsIndicator jobs={jobs} activeCount={activeCount} />
+          <JobsIndicator
+            jobs={jobs}
+            activeCount={activeCount}
+            failedJobs={failedJobs}
+            failedCount={failedCount}
+            onDismissFailedJob={dismissFailedJob}
+          />
           <button
             className="btn btn-primary"
-            onClick={() => setGenerateOpen(!generateOpen)}
+            onClick={() => setGenerateOpen(true)}
           >
-            {generateOpen ? 'Close' : 'Generate'}
+            Generate
           </button>
         </header>
-
-        {generateOpen && (
-          <GenerateForm
-            models={models}
-            generating={generating}
-            error={generateError}
-            onGenerate={handleGenerate}
-            onCollapse={() => setGenerateOpen(false)}
-          />
-        )}
 
         <Gallery
           generations={generations}
@@ -402,6 +429,7 @@ export default function App() {
           hiddenTags={hiddenTags}
           onToggleHiddenTag={toggleHiddenTag}
           onClose={() => setSettingsOpen(false)}
+          onSelfHostedChange={refreshSelfHostedStatus}
         />
       )}
 
@@ -447,6 +475,14 @@ export default function App() {
           selectedRefIds={new Set(remixReferences.map((r) => r.id))}
           onSelect={handleAddReferenceFromPicker}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {generateOpen && (
+        <GenerateModal
+          models={models}
+          onClose={() => setGenerateOpen(false)}
+          onGenerate={handleGenerate}
         />
       )}
 

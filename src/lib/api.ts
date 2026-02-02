@@ -8,6 +8,7 @@ import type {
   CostSummary,
   Reference,
   Job,
+  SelfHostedStatus,
 } from './types';
 
 export async function generateImage(params: GenerateParams): Promise<Generation> {
@@ -81,4 +82,22 @@ export function getImageUrl(path: string): string {
 
 export async function listJobs(): Promise<Job[]> {
   return invoke('list_jobs');
+}
+
+export async function listFailedJobs(limit?: number): Promise<Job[]> {
+  return invoke('list_failed_jobs', { limit });
+}
+
+// Self-hosted server settings
+
+export async function getSelfhostedUrl(): Promise<string | null> {
+  return invoke('get_selfhosted_url');
+}
+
+export async function setSelfhostedUrl(url: string | null): Promise<void> {
+  return invoke('set_selfhosted_url', { url });
+}
+
+export async function checkSelfhostedHealth(): Promise<SelfHostedStatus> {
+  return invoke('check_selfhosted_health');
 }

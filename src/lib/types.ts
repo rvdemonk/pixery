@@ -51,6 +51,16 @@ export interface ModelInfo {
   provider: string;
   display_name: string;
   cost_per_image: number;
+  max_refs?: number;
+}
+
+export interface SelfHostedStatus {
+  connected: boolean;
+  url: string | null;
+  current_model: string | null;
+  available_models: string[];
+  gpu_name: string | null;
+  error: string | null;
 }
 
 export interface CostSummary {

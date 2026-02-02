@@ -42,6 +42,10 @@ pub fn run() {
             commands::get_image_path,
             commands::get_references,
             commands::list_jobs,
+            commands::list_failed_jobs,
+            commands::get_selfhosted_url,
+            commands::set_selfhosted_url,
+            commands::check_selfhosted_health,
         ])
         .setup(|app| {
             // Start file watcher for auto-refresh

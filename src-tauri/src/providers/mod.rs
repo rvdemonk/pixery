@@ -6,6 +6,7 @@ use crate::models::{GenerationResult, ModelInfo, Provider};
 pub mod fal;
 pub mod gemini;
 pub mod openai;
+pub mod selfhosted;
 
 /// Generate an image using the appropriate provider for the model
 pub async fn generate(
@@ -20,6 +21,7 @@ pub async fn generate(
         Provider::Gemini => gemini::generate(model, prompt, reference_paths).await,
         Provider::Fal => fal::generate(model, prompt, reference_paths).await,
         Provider::OpenAI => openai::generate(model, prompt, reference_paths).await,
+        Provider::SelfHosted => selfhosted::generate(model, prompt, reference_paths).await,
     }
 }
 

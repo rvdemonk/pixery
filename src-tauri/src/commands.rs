@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 use tauri::State;
+use chrono::{Duration, Local, NaiveDate};
 
 use crate::archive;
 use crate::db::Database;
@@ -21,7 +22,7 @@ pub async fn generate_image(
 
     // Get model info
     let model_info = ModelInfo::find(model);
-    let cost = model_info.as_ref().map(|m| m.cost_per_image);
+    let estimated_cost = model_info.as_ref().map(|m| m.cost_per_image);
     let provider = model_info
         .as_ref()
         .map(|m| m.provider.to_string())
@@ -56,6 +57,9 @@ pub async fn generate_image(
     let (image_path, thumb_path, width, height, file_size) =
         archive::save_image(&result.image_data, &date, &slug, &timestamp)
             .map_err(|e| e.to_string())?;
+
+    // Use actual cost from API response if available, otherwise use estimate
+    let cost = result.cost_usd.or(estimated_cost);
 
     // Insert into database
     let db = state.db.lock().map_err(|e| e.to_string())?;
@@ -205,7 +209,49 @@ pub fn get_cost_summary(
     since: Option<String>,
 ) -> Result<CostSummary, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_cost_summary(since.as_deref()).map_err(|e| e.to_string())
+    let since_date = parse_since(since.as_deref())?;
+    db.get_cost_summary(since_date.as_deref()).map_err(|e| e.to_string())
+}
+
+/// Parse a "since" string (e.g., "7d", "30d", "today") into a date string
+fn parse_since(since: Option<&str>) -> Result<Option<String>, String> {
+    let since = match since {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+
+    if since == "all" {
+        return Ok(None);
+    }
+
+    let now = Local::now().date_naive();
+
+    if since == "today" {
+        return Ok(Some(now.format("%Y-%m-%d").to_string()));
+    }
+
+    if since.ends_with('d') {
+        let days: i64 = since[..since.len() - 1]
+            .parse()
+            .map_err(|_| "Invalid days format")?;
+        let date = now - Duration::days(days);
+        return Ok(Some(date.format("%Y-%m-%d").to_string()));
+    }
+
+    if since.ends_with('w') {
+        let weeks: i64 = since[..since.len() - 1]
+            .parse()
+            .map_err(|_| "Invalid weeks format")?;
+        let date = now - Duration::weeks(weeks);
+        return Ok(Some(date.format("%Y-%m-%d").to_string()));
+    }
+
+    // Try parsing as a date
+    if let Ok(date) = NaiveDate::parse_from_str(since, "%Y-%m-%d") {
+        return Ok(Some(date.format("%Y-%m-%d").to_string()));
+    }
+
+    Err("Invalid since format. Use 'today', '7d', '2w', or 'YYYY-MM-DD'".to_string())
 }
 
 #[tauri::command]
@@ -225,4 +271,69 @@ pub fn get_references(state: State<'_, AppState>, id: i64) -> Result<Vec<Referen
 pub fn list_jobs(state: State<'_, AppState>) -> Result<Vec<Job>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.list_active_jobs().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_failed_jobs(state: State<'_, AppState>, limit: Option<i64>) -> Result<Vec<Job>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.list_recent_failed_jobs(limit.unwrap_or(10)).map_err(|e| e.to_string())
+}
+
+// Self-hosted server settings and health check commands
+
+#[tauri::command]
+pub fn get_selfhosted_url() -> Option<String> {
+    crate::providers::selfhosted::get_server_url()
+}
+
+#[tauri::command]
+pub fn set_selfhosted_url(url: Option<String>) -> Result<(), String> {
+    crate::providers::selfhosted::set_server_url(url.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+/// Health check response for the frontend
+#[derive(serde::Serialize)]
+pub struct SelfHostedStatus {
+    pub connected: bool,
+    pub url: Option<String>,
+    pub current_model: Option<String>,
+    pub available_models: Vec<String>,
+    pub gpu_name: Option<String>,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn check_selfhosted_health() -> SelfHostedStatus {
+    let url = crate::providers::selfhosted::get_server_url();
+
+    if let Some(ref server_url) = url {
+        match crate::providers::selfhosted::check_health(server_url).await {
+            Ok(health) => SelfHostedStatus {
+                connected: health.status == "healthy",
+                url: url.clone(),
+                current_model: health.current_model,
+                available_models: health.available_models,
+                gpu_name: health.gpu_name,
+                error: None,
+            },
+            Err(e) => SelfHostedStatus {
+                connected: false,
+                url,
+                current_model: None,
+                available_models: vec![],
+                gpu_name: None,
+                error: Some(e.to_string()),
+            },
+        }
+    } else {
+        SelfHostedStatus {
+            connected: false,
+            url: None,
+            current_model: None,
+            available_models: vec![],
+            gpu_name: None,
+            error: None,
+        }
+    }
 }
