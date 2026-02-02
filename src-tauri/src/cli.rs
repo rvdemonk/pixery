@@ -170,6 +170,13 @@ pub enum Commands {
         since: String,
     },
 
+    /// Show recent failed generations
+    Failures {
+        /// Number of failures to show
+        #[arg(short = 'n', long, default_value = "10")]
+        limit: i64,
+    },
+
     /// Import an existing image into the archive
     Import {
         /// Path to existing image file
@@ -266,7 +273,7 @@ pub fn run(cmd: Commands) -> Result<()> {
         } => {
             let filter = ListFilter {
                 limit: Some(limit),
-                tag,
+                tags: tag.map(|t| vec![t]),
                 model,
                 starred_only: starred,
                 ..Default::default()
@@ -478,6 +485,24 @@ pub fn run(cmd: Commands) -> Result<()> {
             }
         }
 
+        Commands::Failures { limit } => {
+            let failures = db.list_recent_failed_jobs(limit)?;
+            if failures.is_empty() {
+                println!("No recent failures (last 24 hours)");
+            } else {
+                println!("Recent Failures");
+                println!("===============");
+                for job in failures {
+                    println!();
+                    println!("ID: {} | Model: {} | {}", job.id, job.model, job.completed_at.unwrap_or_default());
+                    println!("Prompt: \"{}\"", truncate_string(&job.prompt, 60));
+                    if let Some(error) = &job.error {
+                        println!("Error: {}", error);
+                    }
+                }
+            }
+        }
+
         Commands::Import {
             file,
             prompt,
@@ -530,7 +555,7 @@ async fn generate_image(
 ) -> Result<()> {
     // Get model info
     let model_info = ModelInfo::find(model);
-    let cost = model_info.as_ref().map(|m| m.cost_per_image);
+    let estimated_cost = model_info.as_ref().map(|m| m.cost_per_image);
     let provider = model_info
         .as_ref()
         .map(|m| m.provider.to_string())
@@ -562,6 +587,9 @@ async fn generate_image(
 
     let (image_path, thumb_path, width, height, file_size) =
         archive::save_image(&result.image_data, &date, &slug, &timestamp)?;
+
+    // Use actual cost from API response if available, otherwise use estimate
+    let cost = result.cost_usd.or(estimated_cost);
 
     // Insert into database
     let gen_id = db.insert_generation(
@@ -605,7 +633,8 @@ async fn generate_image(
 
     println!("Generated: {} (ID: {})", image_path.display(), gen_id);
     if let Some(c) = cost {
-        println!("Cost: ${:.3}", c);
+        let cost_type = if result.cost_usd.is_some() { "actual" } else { "estimated" };
+        println!("Cost: ${:.4} ({})", c, cost_type);
     }
 
     Ok(())
@@ -750,6 +779,14 @@ fn print_generations(generations: &[crate::models::Generation]) {
             "{:>4}{} {:<12} {:<25} {:<40}",
             gen.id, star, gen.date, gen.model, prompt_display
         );
+    }
+}
+
+fn truncate_string(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len.saturating_sub(3)])
     }
 }
 

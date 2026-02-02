@@ -198,34 +198,47 @@ impl Database {
         let mut conditions = vec![];
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = vec![];
 
-        if filter.tag.is_some() {
-            sql.push_str(" JOIN generation_tags gt ON g.id = gt.generation_id JOIN tags t ON gt.tag_id = t.id");
-        }
-
         // Exclude trashed items by default
-        conditions.push("g.trashed_at IS NULL");
+        conditions.push("g.trashed_at IS NULL".to_string());
 
-        if let Some(ref tag) = filter.tag {
-            conditions.push("t.name = ?");
-            params_vec.push(Box::new(tag.clone()));
+        // Multi-tag filter with AND logic: images must have ALL specified tags
+        if let Some(ref tags) = filter.tags {
+            if !tags.is_empty() {
+                let placeholders: Vec<&str> = tags.iter().map(|_| "?").collect();
+                let in_clause = placeholders.join(", ");
+                conditions.push(format!(
+                    "g.id IN (
+                        SELECT gt.generation_id FROM generation_tags gt
+                        JOIN tags t ON gt.tag_id = t.id
+                        WHERE t.name IN ({})
+                        GROUP BY gt.generation_id
+                        HAVING COUNT(DISTINCT t.name) = {}
+                    )",
+                    in_clause,
+                    tags.len()
+                ));
+                for tag in tags {
+                    params_vec.push(Box::new(tag.clone()));
+                }
+            }
         }
 
         if let Some(ref model) = filter.model {
-            conditions.push("g.model = ?");
+            conditions.push("g.model = ?".to_string());
             params_vec.push(Box::new(model.clone()));
         }
 
         if filter.starred_only {
-            conditions.push("g.starred = 1");
+            conditions.push("g.starred = 1".to_string());
         }
 
         if let Some(ref search) = filter.search {
-            conditions.push("g.prompt LIKE ?");
+            conditions.push("g.prompt LIKE ?".to_string());
             params_vec.push(Box::new(format!("%{}%", search)));
         }
 
         if let Some(ref since) = filter.since {
-            conditions.push("g.date >= ?");
+            conditions.push("g.date >= ?".to_string());
             params_vec.push(Box::new(since.clone()));
         }
 
@@ -650,6 +663,47 @@ impl Database {
         )?;
 
         let rows = stmt.query_map([], |row| {
+            let status_str: String = row.get(1)?;
+            let source_str: String = row.get(5)?;
+            let tags_json: Option<String> = row.get(4)?;
+
+            Ok(Job {
+                id: row.get(0)?,
+                status: status_str.parse().unwrap_or(JobStatus::Pending),
+                model: row.get(2)?,
+                prompt: row.get(3)?,
+                tags: tags_json.and_then(|s| serde_json::from_str(&s).ok()),
+                source: source_str.parse().unwrap_or(JobSource::Cli),
+                ref_count: row.get(6)?,
+                created_at: row.get(7)?,
+                started_at: row.get(8)?,
+                completed_at: row.get(9)?,
+                generation_id: row.get(10)?,
+                error: row.get(11)?,
+            })
+        })?;
+
+        let mut jobs = vec![];
+        for row in rows {
+            jobs.push(row?);
+        }
+        Ok(jobs)
+    }
+
+    /// List recent failed jobs (last 24 hours)
+    pub fn list_recent_failed_jobs(&self, limit: i64) -> Result<Vec<Job>> {
+        let cutoff = chrono::Local::now() - chrono::Duration::hours(24);
+        let cutoff_str = cutoff.format("%Y-%m-%dT%H:%M:%S").to_string();
+
+        let mut stmt = self.conn.prepare(
+            "SELECT id, status, model, prompt, tags, source, ref_count, created_at, started_at, completed_at, generation_id, error
+             FROM generation_jobs
+             WHERE status = 'failed' AND completed_at >= ?1
+             ORDER BY completed_at DESC
+             LIMIT ?2",
+        )?;
+
+        let rows = stmt.query_map(params![cutoff_str, limit], |row| {
             let status_str: String = row.get(1)?;
             let source_str: String = row.get(5)?;
             let tags_json: Option<String> = row.get(4)?;

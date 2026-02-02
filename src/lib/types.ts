@@ -34,7 +34,7 @@ export interface GenerateParams {
 export interface ListFilter {
   limit?: number;
   offset?: number;
-  tag?: string;
+  tags?: string[];
   model?: string;
   starred_only?: boolean;
   search?: string;

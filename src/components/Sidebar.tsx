@@ -2,8 +2,8 @@ import type { TagCount } from '../lib/types';
 
 interface SidebarProps {
   tags: TagCount[];
-  selectedTag: string | null;
-  onSelectTag: (tag: string | null) => void;
+  filterTags: string[];
+  onToggleTag: (tag: string) => void;
   starredOnly: boolean;
   onToggleStarred: () => void;
   onOpenDashboard: () => void;
@@ -14,8 +14,8 @@ interface SidebarProps {
 
 export function Sidebar({
   tags,
-  selectedTag,
-  onSelectTag,
+  filterTags,
+  onToggleTag,
   starredOnly,
   onToggleStarred,
   onOpenDashboard,
@@ -39,9 +39,10 @@ export function Sidebar({
 
         <div className="sidebar-section">
           <button
-            className={`sidebar-item ${!selectedTag && !starredOnly ? 'sidebar-item-active' : ''}`}
+            className={`sidebar-item ${filterTags.length === 0 && !starredOnly ? 'sidebar-item-active' : ''}`}
             onClick={() => {
-              onSelectTag(null);
+              // Clear all filter tags when clicking "All"
+              filterTags.forEach((tag) => onToggleTag(tag));
               if (starredOnly) onToggleStarred();
             }}
           >
@@ -61,8 +62,8 @@ export function Sidebar({
             {tags.map((tag) => (
               <button
                 key={tag.name}
-                className={`sidebar-item ${selectedTag === tag.name ? 'sidebar-item-active' : ''}`}
-                onClick={() => onSelectTag(selectedTag === tag.name ? null : tag.name)}
+                className={`sidebar-item ${filterTags.includes(tag.name) ? 'sidebar-item-active' : ''}`}
+                onClick={() => onToggleTag(tag.name)}
               >
                 <span className="truncate">{tag.name}</span>
                 <span className="sidebar-count">{tag.count}</span>
@@ -76,9 +77,16 @@ export function Sidebar({
 
         <div className="sidebar-footer">
           <button className="sidebar-item" onClick={onOpenDashboard}>
-            <span>Cost Dashboard</span>
+            <svg className="sidebar-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1 14h14v1H1v-1zm1-3h2v3H2v-3zm3-2h2v5H5V9zm3-3h2v8H8V6zm3-4h2v12h-2V2z"/>
+            </svg>
+            <span>Costs</span>
           </button>
           <button className="sidebar-item" onClick={onOpenSettings}>
+            <svg className="sidebar-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0-1a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+              <path d="M14.5 7h-.79a5.61 5.61 0 0 0-.44-1.06l.56-.56a.5.5 0 0 0 0-.71l-.71-.71a.5.5 0 0 0-.71 0l-.56.56A5.61 5.61 0 0 0 10.79 4h-.01V3.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v.79c-.37.11-.72.26-1.06.44l-.56-.56a.5.5 0 0 0-.71 0l-.71.71a.5.5 0 0 0 0 .71l.56.56c-.18.34-.33.69-.44 1.06H5.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h.79c.11.37.26.72.44 1.06l-.56.56a.5.5 0 0 0 0 .71l.71.71a.5.5 0 0 0 .71 0l.56-.56c.34.18.69.33 1.06.44v.79a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-.79c.37-.11.72-.26 1.06-.44l.56.56a.5.5 0 0 0 .71 0l.71-.71a.5.5 0 0 0 0-.71l-.56-.56c.18-.34.33-.69.44-1.06h.79a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/>
+            </svg>
             <span>Settings</span>
           </button>
         </div>
@@ -132,11 +140,22 @@ export function Sidebar({
           display: flex;
           align-items: center;
           justify-content: space-between;
+          gap: var(--spacing-sm);
           width: 100%;
           padding: var(--spacing-sm) var(--spacing-md);
           text-align: left;
           color: var(--text-secondary);
           transition: all var(--transition-fast);
+        }
+        .sidebar-icon {
+          flex-shrink: 0;
+          opacity: 0.7;
+        }
+        .sidebar-item:hover .sidebar-icon {
+          opacity: 1;
+        }
+        .sidebar-footer .sidebar-item {
+          justify-content: flex-start;
         }
         .sidebar-item:hover {
           background: var(--bg-hover);

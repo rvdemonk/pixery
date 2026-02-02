@@ -52,8 +52,6 @@ Items to address when bandwidth allows.
 
 - [ ] `#feature` Regenerate with parent_id - track lineage when regenerating (DB schema ready, not wired up)
 
-- [ ] `#feature` Reference image UI - drag-drop in generate form (backend supports it)
-
 - [ ] `#feature` Notifications - alert when background generation completes (plugin configured, not implemented)
 
 - [ ] `#feature` Enhanced cost dashboard - make interactive with filtering by date range, models, and tags; drill-down views for cost analysis
@@ -80,6 +78,8 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] Tag filter bar - replaces search bar with tag-based filtering; autocomplete dropdown, chips for selected tags, multi-tag AND logic, sidebar tags toggle filter
+- [x] GenerateModal with gallery browser - replaces dropdown form; browse gallery to select references, preview strip at bottom, Reference button in Details pre-loads current image
 - [x] CLI image preview for Claude (`pixery view <ids>... [--width] [--height]`) - outputs resized images to `/tmp/pixery-preview/` for agent viewing
 - [x] Generation progress feedback system (jobs table, header indicator)
 - [x] Settings modal with hidden tags (cog icon in header, localStorage persistence)

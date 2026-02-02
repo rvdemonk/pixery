@@ -196,7 +196,7 @@ pub struct CostSummary {
 pub struct ListFilter {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
-    pub tag: Option<String>,
+    pub tags: Option<Vec<String>>,
     pub model: Option<String>,
     pub starred_only: bool,
     pub search: Option<String>,

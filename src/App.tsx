@@ -21,6 +21,7 @@ import { JobsIndicator } from './components/JobsIndicator';
 import { RemixModal } from './components/RemixModal';
 import { GalleryPickerModal } from './components/GalleryPickerModal';
 import { Settings } from './components/Settings';
+import { TagFilterBar } from './components/TagFilterBar';
 import type { Reference } from './lib/types';
 
 type View = 'gallery' | 'compare' | 'dashboard';
@@ -28,7 +29,7 @@ type View = 'gallery' | 'compare' | 'dashboard';
 export default function App() {
   // Filter state
   const [filter, setFilter] = useState<ListFilter>({ limit: 100 });
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [filterTags, setFilterTags] = useState<string[]>([]);
   const [starredOnly, setStarredOnly] = useState(false);
 
   // Selection state
@@ -40,7 +41,6 @@ export default function App() {
   const [view, setView] = useState<View>('gallery');
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generateInitialState, setGenerateInitialState] = useState<GenerateModalInitialState | undefined>(undefined);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(false);
@@ -83,7 +83,7 @@ export default function App() {
   }, [cloudModels, selfHostedStatus]);
 
   // Hooks
-  const { generations: allGenerations, loading, refresh, search } = useGenerations({ filter });
+  const { generations: allGenerations, loading, refresh } = useGenerations({ filter });
   const { tags: allTags, addTags, removeTag, refresh: refreshTags } = useTags();
   const { generating, error: generateError, generate } = useGenerate();
   const { jobs, activeCount, failedJobs, failedCount, dismissFailedJob } = useJobs();
@@ -122,14 +122,27 @@ export default function App() {
     };
   }, [refresh, refreshTags]);
 
-  // Update filter when tag/starred changes
+  // Update filter when tags/starred changes
   useEffect(() => {
     setFilter((prev) => ({
       ...prev,
-      tag: selectedTag || undefined,
+      tags: filterTags.length > 0 ? filterTags : undefined,
       starred_only: starredOnly,
     }));
-  }, [selectedTag, starredOnly]);
+  }, [filterTags, starredOnly]);
+
+  // Tag filter handlers
+  const addFilterTag = useCallback((tag: string) => {
+    setFilterTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
+  }, []);
+
+  const removeFilterTag = useCallback((tag: string) => {
+    setFilterTags((prev) => prev.filter((t) => t !== tag));
+  }, []);
+
+  const clearFilterTags = useCallback(() => {
+    setFilterTags([]);
+  }, []);
 
   // Selected generation
   const selectedGeneration = useMemo(
@@ -307,15 +320,6 @@ export default function App() {
     }
   }, [generate, refresh, refreshTags]);
 
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    if (query) {
-      search(query);
-    } else {
-      refresh();
-    }
-  }, [search, refresh]);
-
   // Keyboard shortcuts
   useKeyboard({
     onNext: selectNext,
@@ -330,7 +334,7 @@ export default function App() {
       setGenerateInitialState(undefined);
       setGenerateOpen(true);
     },
-    onFocusSearch: () => document.getElementById('search-input')?.focus(),
+    onFocusSearch: () => document.getElementById('tag-filter-input')?.focus(),
     onShowHelp: () => setShowHelp(true),
     onEscape: () => {
       if (lightboxOpen) {
@@ -363,8 +367,14 @@ export default function App() {
     <div className="app-layout">
       <Sidebar
         tags={tags}
-        selectedTag={selectedTag}
-        onSelectTag={setSelectedTag}
+        filterTags={filterTags}
+        onToggleTag={(tag) => {
+          if (filterTags.includes(tag)) {
+            removeFilterTag(tag);
+          } else {
+            addFilterTag(tag);
+          }
+        }}
         starredOnly={starredOnly}
         onToggleStarred={() => setStarredOnly(!starredOnly)}
         onOpenDashboard={() => setView('dashboard')}
@@ -375,15 +385,13 @@ export default function App() {
 
       <main className="main-content">
         <header className="column-header main-header">
-          <div className="search-bar">
-            <input
-              id="search-input"
-              type="text"
-              placeholder="Search prompts... (press /)"
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
-          </div>
+          <TagFilterBar
+            filterTags={filterTags}
+            onAddTag={addFilterTag}
+            onRemoveTag={removeFilterTag}
+            onClearTags={clearFilterTags}
+            availableTags={tags}
+          />
           <JobsIndicator
             jobs={jobs}
             activeCount={activeCount}
@@ -520,13 +528,6 @@ export default function App() {
       <style>{`
         .main-header {
           gap: var(--spacing-md);
-        }
-        .search-bar {
-          flex: 1;
-        }
-        .search-bar input {
-          width: 100%;
-          max-width: 400px;
         }
       `}</style>
     </div>
