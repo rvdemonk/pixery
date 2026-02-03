@@ -15,6 +15,14 @@ pub async fn generate(
     reference_paths: &[String],
 ) -> Result<GenerationResult> {
     let provider = ModelInfo::provider_for_model(model)
+        .or_else(|| {
+            // Fallback: route unknown models to self-hosted server if configured
+            if selfhosted::get_server_url().is_some() {
+                Some(Provider::SelfHosted)
+            } else {
+                None
+            }
+        })
         .ok_or_else(|| anyhow::anyhow!("Unknown model: {}", model))?;
 
     match provider {

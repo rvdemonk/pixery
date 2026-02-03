@@ -117,6 +117,29 @@ impl ModelInfo {
                 cost_per_image: 0.02,
                 max_refs: 0,
             },
+            // Self-hosted models - requires SELFHOSTED_API_URL or GUI settings
+            // IP-Adapter supports 1 reference image
+            ModelInfo {
+                id: "animagine".into(),
+                provider: Provider::SelfHosted,
+                display_name: "Animagine XL 4.0 (Local)".into(),
+                cost_per_image: 0.0,
+                max_refs: 1,
+            },
+            ModelInfo {
+                id: "pony".into(),
+                provider: Provider::SelfHosted,
+                display_name: "Pony Diffusion V6 (Local)".into(),
+                cost_per_image: 0.0,
+                max_refs: 1,
+            },
+            ModelInfo {
+                id: "noobai".into(),
+                provider: Provider::SelfHosted,
+                display_name: "NoobAI XL (Local)".into(),
+                cost_per_image: 0.0,
+                max_refs: 1,
+            },
         ]
     }
 
