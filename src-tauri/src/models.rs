@@ -84,45 +84,122 @@ impl PromptingGuide {
                 model_pattern: "animagine",
                 style: "tags",
                 required_prefix: None,
-                structure: "[count], [character], [appearance], [outfit], [pose], [expression], [setting], [quality tags]",
+                structure: "[count], [character], [series], [rating], [appearance], [outfit], [pose], [expression], [setting], [year], [quality]",
                 tips: r#"- STRICT booru tag format - natural language WILL FAIL
 - Comma-separated tags only, no sentences
-- Quality tags at end: masterpiece, high score, great score, absurdres
-- Use underscores for multi-word tags: long_hair, blue_eyes"#,
-                avoid: Some("natural language, sentences, prose descriptions"),
+- Use underscores for multi-word tags: long_hair, blue_eyes
+
+RATING TAGS (content safety):
+  safe, sensitive, nsfw, explicit
+
+YEAR TAGS (anime era/style):
+  year 2005  - early 2000s style (Code Geass, Death Note)
+  year 2000  - late 90s style (NGE, Cowboy Bebop adjacent)
+  year 2015  - mid 2010s style
+  year 2023  - contemporary anime style
+
+SCORE TAGS (quality control, strongest to weakest):
+  high score > great score > good score > average score > bad score > low score
+  Use lower scores intentionally for rougher/sketchier aesthetics
+
+QUALITY TAGS (add at end):
+  masterpiece, best quality, absurdres  - highest quality
+  low quality, worst quality            - for negative prompt
+
+RESOLUTIONS (SDXL native):
+  Square:    1024x1024 (1:1)
+  Portrait:  832x1216 (2:3), 768x1344 (4:7)
+  Landscape: 1216x832 (3:2), 1344x768 (7:4)
+
+LIMITATIONS:
+  - Hands/fingers often malformed - check outputs carefully
+  - No text rendering - don't request text in images
+  - Recent characters have lower accuracy (limited training data)
+  - Multiple characters need careful prompt engineering
+  - Above 1536x1536 degrades quality (trained on SDXL resolution)
+  - Style consistency requires explicit style tags"#,
+                avoid: Some("natural language, sentences, prose, text in images, resolutions above 1536x1536"),
                 negative_template: Some("lowres, bad anatomy, bad hands, text, error, missing finger, extra digits, fewer digits, cropped, worst quality, low quality, low score, bad score, average score, signature, watermark, username, blurry"),
-                settings: Some("CFG: 5, Steps: 28, Sampler: Euler a"),
-                example: "1girl, solo, long silver hair, blue eyes, black hoodie, standing, smile, city background, night, masterpiece, high score, great score, absurdres",
+                settings: Some("CFG: 4-7 (5 recommended), Steps: 25-28, Sampler: Euler a"),
+                example: "1girl, solo, long silver hair, blue eyes, black hoodie, standing, smile, city background, night, year 2015, safe, masterpiece, high score, great score, absurdres",
             },
             // Pony - hybrid natural + tags
             PromptingGuide {
                 model_pattern: "pony",
                 style: "hybrid",
                 required_prefix: Some("score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up"),
-                structure: "[score tags], [source tag], [description or tags]",
-                tips: r#"- CRITICAL: CLIP Skip MUST be 2 or output is garbage
-- Always start with full score tag chain
-- Source tags: source_anime, source_cartoon, source_furry, source_pony
-- Can mix natural language with tags after the prefix
-- For anime style, add source_anime to positive"#,
-                avoid: None,
-                negative_template: Some("source_cartoon, source_furry, source_pony, lowres, bad anatomy, bad hands"),
-                settings: Some("CFG: 7, Steps: 25+, Sampler: Euler a, CLIP Skip: 2 (CRITICAL)"),
-                example: "score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up, source_anime, 1girl, silver hair, blue eyes, standing in rain, city night, neon lights reflecting on wet pavement",
+                structure: "[score tags], [source tag], [rating], [description or tags]",
+                tips: r#"- CRITICAL: CLIP Skip MUST be 2 or output is garbage (low quality blobs)
+- Always start with full score tag chain (training quirk, works better than score_9 alone)
+- Natural language capable - understands both prose and tags
+- No negative prompts needed in most cases
+
+SOURCE TAGS (style control):
+  source_anime    - anime style (add to fight Western art bias)
+  source_cartoon  - Western cartoon style
+  source_furry    - furry art style
+  source_pony     - MLP style
+
+RATING TAGS:
+  rating_safe, rating_questionable, rating_explicit
+
+QUALITY NOTES:
+  - Avoid extra quality modifiers like "hd" or "masterpiece" - score tags handle this
+  - Full score chain works better than abbreviated versions
+
+RESOLUTIONS:
+  1024x1024 recommended, flexible with SDXL resolutions
+
+LIMITATIONS:
+  - Sometimes generates pseudo-signatures hard to remove even with negatives
+  - If signatures persist, try inpainting or V5.5"#,
+                avoid: Some("hd, masterpiece, best quality (score tags replace these)"),
+                negative_template: Some("source_cartoon, source_furry, source_pony (for anime style)"),
+                settings: Some("CFG: 7, Steps: 25, Sampler: Euler a, CLIP Skip: 2 (CRITICAL)"),
+                example: "score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up, source_anime, rating_safe, 1girl, silver hair, blue eyes, standing in rain, city night, neon lights reflecting on wet pavement",
             },
-            // NoobAI - similar to Pony but different quality tags
+            // NoobAI - v-prediction model, different from epsilon models
             PromptingGuide {
                 model_pattern: "noobai",
                 style: "hybrid",
-                required_prefix: Some("masterpiece, best quality"),
-                structure: "[quality tags], [character], [appearance], [setting], [style]",
-                tips: r#"- Based on NAI/Pony lineage, uses quality prefix
+                required_prefix: Some("masterpiece, best quality, newest, absurdres, highres"),
+                structure: "[quality], [count], [character], [series], [artists], [special tags], [general tags]",
+                tips: r#"- V-PREDICTION MODEL - different architecture from Pony/Animagine
 - Handles both tags and natural language
-- More forgiving than Animagine, less strict than Pony"#,
-                avoid: Some("worst quality, low quality, bad anatomy"),
-                negative_template: Some("worst quality, low quality, bad anatomy, bad hands, text, error, watermark, signature"),
-                settings: Some("CFG: 7, Steps: 28, Sampler: Euler a"),
-                example: "masterpiece, best quality, 1girl, silver hair, blue eyes, black jacket, standing on rooftop, city skyline, sunset, dramatic lighting",
+- CRITICAL: Use Euler or DDIM sampler ONLY - Karras samplers DO NOT WORK
+
+QUALITY TAGS (percentile-based):
+  masterpiece     - >95th percentile
+  best quality    - 85-95th percentile
+  good quality    - 60-85th percentile
+  normal quality  - 30-60th percentile
+  worst quality   - <30th percentile (for negative)
+
+AESTHETIC TAGS:
+  very awa        - top 5% aesthetic scores
+  worst aesthetic - bottom 5% (for negative)
+
+DATE/ERA TAGS:
+  newest          - 2021-2024 (recommended default)
+  recent          - 2018-2020
+  mid             - 2014-2017
+  early           - 2011-2014
+  old             - 2005-2010
+  Or use: year 2021, year 2019, etc.
+
+RESOLUTIONS (SDXL, ~1M pixels total):
+  Portrait:  832x1216 (optimal), 768x1344
+  Square:    1024x1024
+  Landscape: 1216x832, 1344x768
+
+LIMITATIONS:
+  - NO Karras samplers (v-prediction incompatible)
+  - Requires Euler or DDIM only
+  - Dynamic CFG 0.2 helps prevent oversaturation"#,
+                avoid: Some("Karras samplers, DPM++ Karras, resolutions far from 1M pixels"),
+                negative_template: Some("nsfw, worst quality, old, early, low quality, lowres, signature, username, logo, bad hands, mutated hands, mammal, anthro, furry, ambiguous form, feral, semi-anthro"),
+                settings: Some("CFG: 4-5, Steps: 28-35, Sampler: Euler (REQUIRED, no Karras), Dynamic CFG: 0.2 (optional)"),
+                example: "masterpiece, best quality, newest, absurdres, highres, safe, 1girl, silver hair, blue eyes, black jacket, standing on rooftop, city skyline, sunset, dramatic lighting, year 2023",
             },
         ]
     }
