@@ -2,12 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 
 const STORAGE_KEY = 'pixery-settings';
 
+export type ThumbnailSize = 'small' | 'medium' | 'large' | 'xl' | 'xxl';
+
 interface Settings {
   hiddenTags: string[];
+  thumbnailSize: ThumbnailSize;
 }
 
 const defaultSettings: Settings = {
   hiddenTags: [],
+  thumbnailSize: 'medium',
 };
 
 function loadSettings(): Settings {
@@ -55,10 +59,16 @@ export function useSettings() {
     [settings.hiddenTags]
   );
 
+  const setThumbnailSize = useCallback((size: ThumbnailSize) => {
+    setSettings((prev) => ({ ...prev, thumbnailSize: size }));
+  }, []);
+
   return {
     settings,
     hiddenTags: settings.hiddenTags,
     toggleHiddenTag,
     isTagHidden,
+    thumbnailSize: settings.thumbnailSize,
+    setThumbnailSize,
   };
 }

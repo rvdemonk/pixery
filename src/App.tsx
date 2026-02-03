@@ -88,7 +88,7 @@ export default function App() {
   const { tags: allTags, addTags, removeTag, refresh: refreshTags } = useTags();
   const { generating, error: generateError, generate } = useGenerate();
   const { jobs, activeCount, failedJobs, failedCount, dismissFailedJob } = useJobs();
-  const { hiddenTags, toggleHiddenTag } = useSettings();
+  const { hiddenTags, toggleHiddenTag, thumbnailSize, setThumbnailSize } = useSettings();
 
   // Filter out hidden tags
   const generations = useMemo(
@@ -397,6 +397,18 @@ export default function App() {
             filterModel={filterModel}
             onSetModel={setFilterModel}
           />
+          <select
+            className="size-select"
+            value={thumbnailSize}
+            onChange={(e) => setThumbnailSize(e.target.value as typeof thumbnailSize)}
+            title="Thumbnail size"
+          >
+            <option value="small">S</option>
+            <option value="medium">M</option>
+            <option value="large">L</option>
+            <option value="xl">XL</option>
+            <option value="xxl">XXL</option>
+          </select>
           <JobsIndicator
             jobs={jobs}
             activeCount={activeCount}
@@ -418,6 +430,7 @@ export default function App() {
         <Gallery
           generations={generations}
           selectedId={selectedId}
+          thumbnailSize={thumbnailSize}
           onSelect={(id) => {
             setSelectedId(id);
             setDetailsOpen(true);
@@ -534,6 +547,24 @@ export default function App() {
       <style>{`
         .main-header {
           gap: var(--spacing-md);
+        }
+        .size-select {
+          height: 36px;
+          padding: 0 var(--spacing-md);
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          color: var(--text-primary);
+          font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+          font-weight: 500;
+          cursor: pointer;
+        }
+        .size-select:hover {
+          border-color: var(--border-light);
+        }
+        .size-select:focus {
+          outline: none;
+          border-color: var(--accent);
         }
       `}</style>
     </div>

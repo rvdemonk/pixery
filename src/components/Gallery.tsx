@@ -1,15 +1,25 @@
 import { useRef, useEffect, useCallback, memo } from 'react';
 import type { Generation } from '../lib/types';
+import type { ThumbnailSize } from '../hooks/useSettings';
 import { Thumbnail } from './Thumbnail';
 
 interface GalleryProps {
   generations: Generation[];
   selectedId: number | null;
+  thumbnailSize: ThumbnailSize;
   onSelect: (id: number) => void;
   onDoubleClick: (id: number) => void;
   onContextMenu: (generation: Generation, position: { x: number; y: number }) => void;
   loading: boolean;
 }
+
+const GRID_SIZES: Record<ThumbnailSize, string> = {
+  small: '120px',
+  medium: '160px',
+  large: '220px',
+  xl: '400px',
+  xxl: '550px',
+};
 
 /**
  * Wrapper component that provides stable callbacks for each thumbnail
@@ -45,8 +55,9 @@ const ThumbnailWrapper = memo(function ThumbnailWrapper({
   );
 });
 
-export const Gallery = memo(function Gallery({ generations, selectedId, onSelect, onDoubleClick, onContextMenu, loading }: GalleryProps) {
+export const Gallery = memo(function Gallery({ generations, selectedId, thumbnailSize, onSelect, onDoubleClick, onContextMenu, loading }: GalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const gridSize = GRID_SIZES[thumbnailSize];
 
   // Scroll selected item into view
   useEffect(() => {
@@ -74,7 +85,7 @@ export const Gallery = memo(function Gallery({ generations, selectedId, onSelect
   }
 
   return (
-    <div className="gallery" ref={containerRef}>
+    <div className="gallery" ref={containerRef} style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${gridSize}, 1fr))` }}>
       {generations.map((gen) => (
         <div key={gen.id} data-id={gen.id}>
           <ThumbnailWrapper
@@ -89,7 +100,6 @@ export const Gallery = memo(function Gallery({ generations, selectedId, onSelect
       <style>{`
         .gallery {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
           gap: var(--spacing-md);
           padding: var(--spacing-md);
           overflow-y: auto;
