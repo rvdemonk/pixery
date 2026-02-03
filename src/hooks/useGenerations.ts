@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Generation, ListFilter } from '../lib/types';
 import * as api from '../lib/api';
 
+const PAGE_SIZE = 50;
+
 interface UseGenerationsOptions {
   filter?: ListFilter;
   autoRefresh?: boolean;
@@ -10,8 +12,11 @@ interface UseGenerationsOptions {
 interface UseGenerationsResult {
   generations: Generation[];
   loading: boolean;
+  loadingMore: boolean;
   error: string | null;
+  hasMore: boolean;
   refresh: () => Promise<void>;
+  loadMore: () => Promise<void>;
   search: (query: string) => Promise<void>;
 }
 
@@ -52,30 +57,79 @@ function hasGenerationChanged(a: Generation, b: Generation): boolean {
   );
 }
 
+/**
+ * Create a stable key for filter dependencies, excluding limit/offset
+ * so pagination doesn't trigger a full reset
+ */
+function getFilterDepsKey(filter: ListFilter): string {
+  const { limit: _limit, offset: _offset, ...rest } = filter;
+  return JSON.stringify(rest);
+}
+
 export function useGenerations(options: UseGenerationsOptions = {}): UseGenerationsResult {
   const { filter = {}, autoRefresh = false } = options;
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
   const isInitialLoad = useRef(true);
+  const offsetRef = useRef(0);
 
-  const fetchGenerations = useCallback(async () => {
+  // Stable filter key excluding pagination params
+  const filterDepsKey = getFilterDepsKey(filter);
+
+  const fetchGenerations = useCallback(async (append = false) => {
     try {
-      // Only show loading spinner on initial load, not on refresh
-      if (isInitialLoad.current) {
+      if (append) {
+        setLoadingMore(true);
+      } else if (isInitialLoad.current) {
         setLoading(true);
       }
       setError(null);
-      const data = await api.listGenerations(filter);
-      // Merge instead of replace to preserve object references
-      setGenerations(prev => mergeGenerations(prev, data));
+
+      const currentOffset = append ? offsetRef.current : 0;
+      const fetchFilter: ListFilter = {
+        ...filter,
+        limit: PAGE_SIZE,
+        offset: currentOffset,
+      };
+
+      const data = await api.listGenerations(fetchFilter);
+
+      // Determine if there are more results
+      setHasMore(data.length === PAGE_SIZE);
+
+      if (append) {
+        // Append to existing data
+        setGenerations(prev => [...prev, ...data]);
+        offsetRef.current = currentOffset + data.length;
+      } else {
+        // Replace data (initial load or filter change)
+        setGenerations(prev => mergeGenerations(prev, data));
+        offsetRef.current = data.length;
+      }
+
       isInitialLoad.current = false;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load generations');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [JSON.stringify(filter)]);
+  }, [filterDepsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    await fetchGenerations(true);
+  }, [fetchGenerations, loadingMore, hasMore]);
+
+  const refresh = useCallback(async () => {
+    // Reset pagination state
+    offsetRef.current = 0;
+    setHasMore(true);
+    await fetchGenerations(false);
+  }, [fetchGenerations]);
 
   const search = useCallback(async (query: string) => {
     try {
@@ -83,6 +137,8 @@ export function useGenerations(options: UseGenerationsOptions = {}): UseGenerati
       setError(null);
       const data = await api.searchGenerations(query);
       setGenerations(data);
+      setHasMore(false); // Search doesn't support pagination
+      offsetRef.current = data.length;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed');
     } finally {
@@ -90,21 +146,28 @@ export function useGenerations(options: UseGenerationsOptions = {}): UseGenerati
     }
   }, []);
 
+  // Reset and fetch when filter changes (excluding pagination)
   useEffect(() => {
-    fetchGenerations();
-  }, [fetchGenerations]);
+    offsetRef.current = 0;
+    setHasMore(true);
+    isInitialLoad.current = true;
+    fetchGenerations(false);
+  }, [filterDepsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = setInterval(fetchGenerations, 30000);
+    const interval = setInterval(() => fetchGenerations(false), 30000);
     return () => clearInterval(interval);
   }, [autoRefresh, fetchGenerations]);
 
   return {
     generations,
     loading,
+    loadingMore,
     error,
-    refresh: fetchGenerations,
+    hasMore,
+    refresh,
+    loadMore,
     search,
   };
 }

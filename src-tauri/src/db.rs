@@ -223,6 +223,25 @@ impl Database {
             }
         }
 
+        // Exclude generations that have ANY of the excluded tags
+        if let Some(ref exclude_tags) = filter.exclude_tags {
+            if !exclude_tags.is_empty() {
+                let placeholders: Vec<&str> = exclude_tags.iter().map(|_| "?").collect();
+                let in_clause = placeholders.join(", ");
+                conditions.push(format!(
+                    "g.id NOT IN (
+                        SELECT gt.generation_id FROM generation_tags gt
+                        JOIN tags t ON gt.tag_id = t.id
+                        WHERE t.name IN ({})
+                    )",
+                    in_clause
+                ));
+                for tag in exclude_tags {
+                    params_vec.push(Box::new(tag.clone()));
+                }
+            }
+        }
+
         if let Some(ref model) = filter.model {
             conditions.push("g.model = ?".to_string());
             params_vec.push(Box::new(model.clone()));

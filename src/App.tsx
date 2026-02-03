@@ -88,17 +88,20 @@ export default function App() {
   }, [cloudModels, selfHostedStatus]);
 
   // Hooks
-  const { generations: allGenerations, loading, refresh } = useGenerations({ filter });
+  const { hiddenTags, toggleHiddenTag, thumbnailSize, setThumbnailSize } = useSettings();
   const { tags: allTags, addTags, removeTag, refresh: refreshTags } = useTags();
   const { generating, error: generateError, generate } = useGenerate();
   const { jobs, activeCount, failedJobs, failedCount, dismissFailedJob } = useJobs();
-  const { hiddenTags, toggleHiddenTag, thumbnailSize, setThumbnailSize } = useSettings();
 
-  // Filter out hidden tags
-  const generations = useMemo(
-    () => allGenerations.filter((g) => !g.tags.some((t) => hiddenTags.includes(t))),
-    [allGenerations, hiddenTags]
-  );
+  // Build filter with exclude_tags for server-side hidden tag filtering
+  const generationsFilter = useMemo(() => ({
+    ...filter,
+    exclude_tags: hiddenTags.length > 0 ? hiddenTags : undefined,
+  }), [filter, hiddenTags]);
+
+  const { generations, loading, loadingMore, hasMore, refresh, loadMore } = useGenerations({ filter: generationsFilter });
+
+  // Filter out hidden tags from sidebar (client-side is fine for tag list)
   const tags = useMemo(
     () => allTags.filter((t) => !hiddenTags.includes(t.name)),
     [allTags, hiddenTags]
@@ -329,7 +332,7 @@ export default function App() {
   // Multi-selection handlers
   const handleSelect = useCallback((id: number, event: React.MouseEvent) => {
     if (event.metaKey || event.ctrlKey) {
-      // Cmd/Ctrl+click: Toggle mark
+      // Cmd/Ctrl+click: Toggle mark (don't open details)
       setMarkedIds((prev) => {
         const next = new Set(prev);
         if (next.has(id)) {
@@ -340,8 +343,9 @@ export default function App() {
         return next;
       });
       setAnchorId(id);
+      setSelectedId(id);
     } else if (event.shiftKey && anchorId !== null) {
-      // Shift+click: Range select
+      // Shift+click: Range select (don't open details)
       const anchorIndex = generations.findIndex((g) => g.id === anchorId);
       const clickIndex = generations.findIndex((g) => g.id === id);
       if (anchorIndex !== -1 && clickIndex !== -1) {
@@ -354,13 +358,14 @@ export default function App() {
           return next;
         });
       }
+      setSelectedId(id);
     } else {
-      // Plain click: Select single, clear marks
+      // Plain click: Select single, clear marks, open details
       setMarkedIds(new Set());
       setAnchorId(id);
+      setSelectedId(id);
+      setDetailsOpen(true);
     }
-    setSelectedId(id);
-    setDetailsOpen(true);
   }, [generations, anchorId]);
 
   const handleMark = useCallback(() => {
@@ -564,6 +569,9 @@ export default function App() {
             setContextMenu({ generation, position });
           }}
           loading={loading}
+          loadingMore={loadingMore}
+          hasMore={hasMore}
+          onLoadMore={loadMore}
         />
       </main>
 

@@ -220,6 +220,7 @@ pub struct ListFilter {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
     pub tags: Option<Vec<String>>,
+    pub exclude_tags: Option<Vec<String>>,
     pub model: Option<String>,
     pub starred_only: bool,
     pub search: Option<String>,

@@ -35,6 +35,7 @@ export interface ListFilter {
   limit?: number;
   offset?: number;
   tags?: string[];
+  exclude_tags?: string[];
   model?: string;
   starred_only?: boolean;
   search?: string;

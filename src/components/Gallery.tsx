@@ -12,6 +12,9 @@ interface GalleryProps {
   onDoubleClick: (id: number) => void;
   onContextMenu: (generation: Generation, position: { x: number; y: number }) => void;
   loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  onLoadMore: () => void;
 }
 
 const GRID_SIZES: Record<ThumbnailSize, string> = {
@@ -59,9 +62,28 @@ const ThumbnailWrapper = memo(function ThumbnailWrapper({
   );
 });
 
-export const Gallery = memo(function Gallery({ generations, selectedId, markedIds, thumbnailSize, onSelect, onDoubleClick, onContextMenu, loading }: GalleryProps) {
+export const Gallery = memo(function Gallery({
+  generations,
+  selectedId,
+  markedIds,
+  thumbnailSize,
+  onSelect,
+  onDoubleClick,
+  onContextMenu,
+  loading,
+  loadingMore,
+  hasMore,
+  onLoadMore,
+}: GalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const gridSize = GRID_SIZES[thumbnailSize];
+
+  // Use refs for values accessed in observer callback to avoid reconnecting observer
+  const loadingMoreRef = useRef(loadingMore);
+  const onLoadMoreRef = useRef(onLoadMore);
+  loadingMoreRef.current = loadingMore;
+  onLoadMoreRef.current = onLoadMore;
 
   // Scroll selected item into view
   useEffect(() => {
@@ -70,6 +92,27 @@ export const Gallery = memo(function Gallery({ generations, selectedId, markedId
       selected?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [selectedId]);
+
+  // Infinite scroll with IntersectionObserver
+  useEffect(() => {
+    // Don't set up observer while initial loading (sentinel doesn't exist yet)
+    if (loading) return;
+
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loadingMoreRef.current) {
+          onLoadMoreRef.current();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loading, hasMore]);
 
   if (loading) {
     return (
@@ -102,6 +145,12 @@ export const Gallery = memo(function Gallery({ generations, selectedId, markedId
           />
         </div>
       ))}
+      {/* Sentinel for infinite scroll */}
+      {hasMore && (
+        <div ref={sentinelRef} className="gallery-sentinel">
+          {loadingMore && <div className="spinner spinner-small" />}
+        </div>
+      )}
       <style>{`
         .gallery {
           display: grid;
@@ -110,6 +159,18 @@ export const Gallery = memo(function Gallery({ generations, selectedId, markedId
           overflow-y: auto;
           flex: 1;
           align-content: start;
+        }
+        .gallery-sentinel {
+          grid-column: 1 / -1;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: var(--spacing-lg);
+          min-height: 60px;
+        }
+        .spinner-small {
+          width: 24px;
+          height: 24px;
         }
       `}</style>
     </div>
