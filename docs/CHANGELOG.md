@@ -31,6 +31,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Version numbers 
 - Keyboard navigation (vim-style j/k, arrow keys)
 
 ### Added
+- CLI prompting guides: `pixery models MODEL --guide` outputs model-specific prompting instructions (style, required prefixes, structure, negative templates, examples)
+- CLI help improvements: main help shows workflow/iteration patterns, `view` recommends 600px width, `list` documents output columns, `show`/`view` descriptions clarified
+- Prompting guides available for: gemini (prose), animagine (booru tags), pony (score prefixes), noobai (hybrid)
 - Markdown rendering for prompts in details panel (headers, lists, code, emphasis)
 - `pixery regen-thumbs` CLI command to regenerate existing thumbnails
 - Trash feature: images are soft-deleted instead of permanently removed

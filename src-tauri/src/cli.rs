@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::archive;
 use crate::db::Database;
-use crate::models::{JobSource, ListFilter, ModelInfo};
+use crate::models::{JobSource, ListFilter, ModelInfo, PromptingGuide};
 use crate::providers;
 
 #[derive(Subcommand, Clone)]
@@ -39,6 +39,14 @@ pub enum Commands {
     },
 
     /// List recent generations
+    #[command(long_about = "List recent generations with filters.\n\n\
+        Output columns: ID (with * if starred), DATE, MODEL, PROMPT (truncated)\n\n\
+        Examples:\n  \
+        pixery list                       # Last 20 generations\n  \
+        pixery list -n 50                 # Last 50 generations\n  \
+        pixery list --tag character       # Filter by tag\n  \
+        pixery list --model gemini-flash  # Filter by model\n  \
+        pixery list --starred             # Only starred images")]
     List {
         /// Number of results
         #[arg(short = 'n', long, default_value = "20")]
@@ -67,22 +75,28 @@ pub enum Commands {
         limit: i64,
     },
 
-    /// Show details of a generation
+    /// Show generation metadata (prompt, model, tags, cost, references)
+    #[command(long_about = "Show generation metadata as text output.\n\n\
+        Displays: ID, slug, model, date, path, generation time, cost, seed, \
+        dimensions, starred status, tags, references, and full prompt.\n\n\
+        Use 'view' to output the image path for viewing the actual image.")]
     Show {
         /// Generation ID
         id: i64,
     },
 
-    /// Output image paths for agent viewing
+    /// Output image path for viewing (supports --width resize)
     #[command(long_about = "Output image paths for agent viewing.\n\n\
         Without resize options, prints original file paths.\n\
         With --width and/or --height, resizes images (preserving aspect ratio) \
         and writes to /tmp/pixery-preview/, printing the output paths.\n\n\
+        RECOMMENDED: --width 600 for context-efficient viewing without losing detail.\n\
+        This balances image clarity with context window usage.\n\n\
         Designed for Claude to view generations: pipe IDs from 'pixery list' or 'pixery search', \
         then read the output paths.\n\n\
         Examples:\n  \
-        pixery view 140                    # Original path\n  \
-        pixery view 140 --width 800        # Resized to 800px wide\n  \
+        pixery view 140                    # Original path (large)\n  \
+        pixery view 140 -w 600             # Recommended: 600px wide\n  \
         pixery view 140 141 142 -w 600     # Multiple images")]
     View {
         /// Generation IDs to view
@@ -157,8 +171,29 @@ pub enum Commands {
         tags: Option<String>,
     },
 
-    /// List available models
-    Models,
+    /// List available models or show prompting guide
+    #[command(long_about = "List available models or show prompting guide for a specific model.\n\n\
+        Without arguments, lists all models with provider, cost, and reference support.\n\n\
+        With MODEL --guide, shows the prompting guide for that model including:\n\
+        - Style (prose/tags/hybrid)\n\
+        - Required prefix (if any)\n\
+        - Structure and tips\n\
+        - Negative prompt template\n\
+        - Recommended settings\n\
+        - Concrete example\n\n\
+        Examples:\n  \
+        pixery models                    # List all models\n  \
+        pixery models gemini-pro --guide # Gemini prompting guide\n  \
+        pixery models animagine --guide  # Booru tag format guide\n  \
+        pixery models pony --guide       # Pony score prefix guide")]
+    Models {
+        /// Model to get info about (optional)
+        model: Option<String>,
+
+        /// Show prompting guide for the model
+        #[arg(short, long)]
+        guide: bool,
+    },
 
     /// List all tags with counts
     Tags,
@@ -429,20 +464,74 @@ pub fn run(cmd: Commands) -> Result<()> {
             }
         }
 
-        Commands::Models => {
-            let models = ModelInfo::all();
-            println!("{:<30} {:<10} {:>8} {:>8}", "MODEL ID", "PROVIDER", "COST", "REFS");
-            println!("{}", "-".repeat(60));
-            for m in models {
-                let refs_str = if m.max_refs == 0 {
-                    "-".to_string()
-                } else {
-                    format!("{}", m.max_refs)
-                };
-                println!(
-                    "{:<30} {:<10} ${:>6.3} {:>8}",
-                    m.id, m.provider, m.cost_per_image, refs_str
-                );
+        Commands::Models { model, guide } => {
+            match (model, guide) {
+                // pixery models MODEL --guide
+                (Some(m), true) => {
+                    if let Some(g) = PromptingGuide::for_model(&m) {
+                        println!("{}", g.format());
+                    } else {
+                        // No guide available, but model might exist
+                        if ModelInfo::find(&m).is_some() {
+                            println!("No prompting guide available for '{}'. This model uses standard prompting.", m);
+                        } else {
+                            eprintln!("Unknown model: {}", m);
+                            eprintln!("\nAvailable models:");
+                            for info in ModelInfo::all() {
+                                eprintln!("  {}", info.id);
+                            }
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                // pixery models MODEL (no --guide)
+                (Some(m), false) => {
+                    if let Some(info) = ModelInfo::find(&m) {
+                        println!("Model: {}", info.id);
+                        println!("Display name: {}", info.display_name);
+                        println!("Provider: {}", info.provider);
+                        println!("Cost: ${:.3}/image", info.cost_per_image);
+                        println!("Max references: {}", if info.max_refs == 0 { "none (text-to-image only)".to_string() } else { info.max_refs.to_string() });
+
+                        if PromptingGuide::for_model(&m).is_some() {
+                            println!("\nTip: Use --guide for prompting instructions");
+                        }
+                    } else {
+                        eprintln!("Unknown model: {}", m);
+                        eprintln!("\nAvailable models:");
+                        for info in ModelInfo::all() {
+                            eprintln!("  {}", info.id);
+                        }
+                        std::process::exit(1);
+                    }
+                }
+                // pixery models --guide (no model specified)
+                (None, true) => {
+                    println!("Available prompting guides:");
+                    println!();
+                    for g in PromptingGuide::all() {
+                        println!("  {} ({})", g.model_pattern, g.style);
+                    }
+                    println!();
+                    println!("Usage: pixery models MODEL --guide");
+                }
+                // pixery models (list all)
+                (None, false) => {
+                    let models = ModelInfo::all();
+                    println!("{:<30} {:<10} {:>8} {:>8}", "MODEL ID", "PROVIDER", "COST", "REFS");
+                    println!("{}", "-".repeat(60));
+                    for m in models {
+                        let refs_str = if m.max_refs == 0 {
+                            "-".to_string()
+                        } else {
+                            format!("{}", m.max_refs)
+                        };
+                        println!(
+                            "{:<30} {:<10} ${:>6.3} {:>8}",
+                            m.id, m.provider, m.cost_per_image, refs_str
+                        );
+                    }
+                }
             }
         }
 

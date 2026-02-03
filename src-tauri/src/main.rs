@@ -8,8 +8,12 @@ use pixery_lib::cli;
 #[command(about = "Unified image generation tool with CLI and GUI interfaces")]
 #[command(long_about = "Unified image generation tool with CLI and GUI interfaces.\n\n\
     Subcommands provide CLI access; no args launches the GUI.\n\n\
-    Supports Gemini, fal.ai, and OpenAI providers. Images are archived to ~/media/image-gen/ \
-    with SQLite metadata tracking.")]
+    Workflow: generate → list/search → show (metadata) → view (image)\n\
+    Iteration: generate → view → refine prompt or use --ref → generate\n\n\
+    Supports Gemini, fal.ai, OpenAI, and self-hosted providers. Images are archived to \
+    ~/media/image-gen/ with SQLite metadata tracking.\n\n\
+    Model selection: Use 'pixery models' to list available models and 'pixery models MODEL --guide' \
+    for prompting instructions specific to each model.")]
 struct Args {
     #[command(subcommand)]
     command: Option<cli::Commands>,
