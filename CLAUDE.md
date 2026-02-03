@@ -44,6 +44,12 @@ Architecture
 ├── docs/
 │   ├── CHANGELOG.md         # What shipped, by version
 │   └── BACKLOG.md           # Prioritized work items
+├── infra/
+│   └── selfhosted/              # Self-hosted inference on Vast.ai
+│       ├── server.py            # FastAPI inference server (runs on Vast)
+│       ├── setup-instance.sh    # Downloads models on new instance
+│       ├── connect.sh           # SSH with port forwarding
+│       └── OPERATIONS.md        # Full workflow guide
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs              # Entry: CLI args → cli::run(), no args → lib::run()
@@ -54,7 +60,8 @@ Architecture
 │   │   │   ├── mod.rs           # generate() dispatches to provider by model
 │   │   │   ├── gemini.rs        # Google Gemini API (image generation models)
 │   │   │   ├── fal.rs           # fal.ai API (FLUX, Recraft, Z-Image)
-│   │   │   └── openai.rs        # OpenAI API (DALL-E, GPT Image)
+│   │   │   ├── openai.rs        # OpenAI API (DALL-E, GPT Image)
+│   │   │   └── selfhosted.rs    # Self-hosted server (routes to Vast instance)
 │   │   ├── db.rs                # SQLite: generations, tags, references
 │   │   ├── archive.rs           # File ops: save images, thumbnails, dedup refs
 │   │   └── models.rs            # Shared types, ModelInfo registry
@@ -131,6 +138,28 @@ Parameters:
 - `num_inference_steps`: 1-8 (default 8)
 - `image_size`: square, square_hd, portrait_4_3, portrait_16_9, landscape_4_3, landscape_16_9
 - **Max 1 reference image** for image-to-image
+
+Self-Hosted Inference
+----------
+
+Run SDXL models (Animagine, Pony, NoobAI) on rented GPUs via Vast.ai. Server code lives in `infra/selfhosted/`. See `infra/selfhosted/OPERATIONS.md` for full workflow.
+
+**Architecture decision:** Claude orchestrates infrastructure (vastai CLI, ssh, scp). GUI stays simple — just a "Server URL" field in Settings. No Rust wrappers around shell commands.
+
+| Model | Prompt Style | Notes |
+|-------|--------------|-------|
+| `animagine` | danbooru tags, `masterpiece, high score` | Clean anime aesthetic |
+| `pony` | score system, `score_9, score_8_up` | Broader training, flexible |
+| `noobai` | danbooru tags | Good anatomy, permissive |
+
+**Quick start:**
+```bash
+vastai search offers 'gpu_name=RTX_4090 disk_space>=50' --order dph
+vastai create instance <ID> --image pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime --disk 50
+# Connect, deploy, start server — see OPERATIONS.md
+```
+
+**Cost:** ~$0.30/hr for RTX 4090. Destroy instance when done to stop billing.
 
 Non-Obvious Details
 ----------
