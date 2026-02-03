@@ -6,8 +6,9 @@ import { Thumbnail } from './Thumbnail';
 interface GalleryProps {
   generations: Generation[];
   selectedId: number | null;
+  markedIds: Set<number>;
   thumbnailSize: ThumbnailSize;
-  onSelect: (id: number) => void;
+  onSelect: (id: number, event: React.MouseEvent) => void;
   onDoubleClick: (id: number) => void;
   onContextMenu: (generation: Generation, position: { x: number; y: number }) => void;
   loading: boolean;
@@ -27,17 +28,19 @@ const GRID_SIZES: Record<ThumbnailSize, string> = {
 const ThumbnailWrapper = memo(function ThumbnailWrapper({
   generation,
   selected,
+  marked,
   onSelect,
   onDoubleClick,
   onContextMenu,
 }: {
   generation: Generation;
   selected: boolean;
-  onSelect: (id: number) => void;
+  marked: boolean;
+  onSelect: (id: number, event: React.MouseEvent) => void;
   onDoubleClick: (id: number) => void;
   onContextMenu: (generation: Generation, position: { x: number; y: number }) => void;
 }) {
-  const handleClick = useCallback(() => onSelect(generation.id), [onSelect, generation.id]);
+  const handleClick = useCallback((e: React.MouseEvent) => onSelect(generation.id, e), [onSelect, generation.id]);
   const handleDoubleClick = useCallback(() => onDoubleClick(generation.id), [onDoubleClick, generation.id]);
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -48,6 +51,7 @@ const ThumbnailWrapper = memo(function ThumbnailWrapper({
     <Thumbnail
       generation={generation}
       selected={selected}
+      marked={marked}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
@@ -55,7 +59,7 @@ const ThumbnailWrapper = memo(function ThumbnailWrapper({
   );
 });
 
-export const Gallery = memo(function Gallery({ generations, selectedId, thumbnailSize, onSelect, onDoubleClick, onContextMenu, loading }: GalleryProps) {
+export const Gallery = memo(function Gallery({ generations, selectedId, markedIds, thumbnailSize, onSelect, onDoubleClick, onContextMenu, loading }: GalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridSize = GRID_SIZES[thumbnailSize];
 
@@ -91,6 +95,7 @@ export const Gallery = memo(function Gallery({ generations, selectedId, thumbnai
           <ThumbnailWrapper
             generation={gen}
             selected={gen.id === selectedId}
+            marked={markedIds.has(gen.id)}
             onSelect={onSelect}
             onDoubleClick={onDoubleClick}
             onContextMenu={onContextMenu}

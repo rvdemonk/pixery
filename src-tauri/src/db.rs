@@ -330,6 +330,25 @@ impl Database {
         Ok(rows > 0)
     }
 
+    pub fn trash_generations(&self, ids: &[i64]) -> Result<usize> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "UPDATE generations SET trashed_at = ?1 WHERE id IN ({}) AND trashed_at IS NULL",
+            placeholders
+        );
+        let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(now)];
+        for id in ids {
+            params_vec.push(Box::new(*id));
+        }
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let rows = self.conn.execute(&sql, params_refs.as_slice())?;
+        Ok(rows)
+    }
+
     pub fn restore_generation(&self, id: i64) -> Result<bool> {
         let rows = self.conn.execute(
             "UPDATE generations SET trashed_at = NULL WHERE id = ?1 AND trashed_at IS NOT NULL",

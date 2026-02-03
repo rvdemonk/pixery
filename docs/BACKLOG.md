@@ -78,6 +78,7 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] Batch actions with multi-selection - Cmd/Ctrl+click toggles mark, Shift+click range selects; floating action bar for tag/delete/use-as-refs/regen; `m` key marks focused item; `u` clears selection; models auto-disabled when ref count exceeds max_refs
 - [x] Tag filter bar - replaces search bar with tag/model filtering; autocomplete dropdown, chips for selected filters, multi-tag AND logic, model names as virtual tags, sidebar tags toggle filter
 - [x] GenerateModal with gallery browser - replaces dropdown form; browse gallery to select references, preview strip at bottom, Reference button in Details pre-loads current image
 - [x] CLI image preview for Claude (`pixery view <ids>... [--width] [--height]`) - outputs resized images to `/tmp/pixery-preview/` for agent viewing

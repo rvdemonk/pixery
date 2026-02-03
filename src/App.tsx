@@ -22,6 +22,7 @@ import { RemixModal } from './components/RemixModal';
 import { GalleryPickerModal } from './components/GalleryPickerModal';
 import { Settings } from './components/Settings';
 import { TagFilterBar } from './components/TagFilterBar';
+import { BatchActionBar } from './components/BatchActionBar';
 import type { Reference } from './lib/types';
 
 type View = 'gallery' | 'compare' | 'dashboard';
@@ -35,8 +36,11 @@ export default function App() {
 
   // Selection state
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [markedIds, setMarkedIds] = useState<Set<number>>(new Set());
+  const [anchorId, setAnchorId] = useState<number | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [compareIds, setCompareIds] = useState<[number, number] | null>(null);
+  const [batchTagOpen, setBatchTagOpen] = useState(false);
 
   // UI state
   const [view, setView] = useState<View>('gallery');
@@ -322,6 +326,114 @@ export default function App() {
     }
   }, [generate, refresh, refreshTags]);
 
+  // Multi-selection handlers
+  const handleSelect = useCallback((id: number, event: React.MouseEvent) => {
+    if (event.metaKey || event.ctrlKey) {
+      // Cmd/Ctrl+click: Toggle mark
+      setMarkedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return next;
+      });
+      setAnchorId(id);
+    } else if (event.shiftKey && anchorId !== null) {
+      // Shift+click: Range select
+      const anchorIndex = generations.findIndex((g) => g.id === anchorId);
+      const clickIndex = generations.findIndex((g) => g.id === id);
+      if (anchorIndex !== -1 && clickIndex !== -1) {
+        const start = Math.min(anchorIndex, clickIndex);
+        const end = Math.max(anchorIndex, clickIndex);
+        const rangeIds = generations.slice(start, end + 1).map((g) => g.id);
+        setMarkedIds((prev) => {
+          const next = new Set(prev);
+          rangeIds.forEach((rid) => next.add(rid));
+          return next;
+        });
+      }
+    } else {
+      // Plain click: Select single, clear marks
+      setMarkedIds(new Set());
+      setAnchorId(id);
+    }
+    setSelectedId(id);
+    setDetailsOpen(true);
+  }, [generations, anchorId]);
+
+  const handleMark = useCallback(() => {
+    if (!selectedId) return;
+    setMarkedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(selectedId)) {
+        next.delete(selectedId);
+      } else {
+        next.add(selectedId);
+      }
+      return next;
+    });
+  }, [selectedId]);
+
+  const handleClearSelection = useCallback(() => {
+    setMarkedIds(new Set());
+    setBatchTagOpen(false);
+  }, []);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (markedIds.size === 0) return;
+    await api.trashGenerations([...markedIds]);
+    if (selectedId && markedIds.has(selectedId)) {
+      setSelectedId(null);
+      setDetailsOpen(false);
+    }
+    setMarkedIds(new Set());
+    refresh();
+  }, [markedIds, selectedId, refresh]);
+
+  const handleBatchTag = useCallback(async (tag: string) => {
+    if (markedIds.size === 0) return;
+    for (const id of markedIds) {
+      await addTags(id, [tag]);
+    }
+    refresh();
+    refreshTags();
+  }, [markedIds, addTags, refresh, refreshTags]);
+
+  const handleUseAsRefs = useCallback(() => {
+    if (markedIds.size === 0) return;
+    const refs = generations
+      .filter((g) => markedIds.has(g.id))
+      .map((g) => ({
+        id: g.id,
+        path: g.image_path,
+        thumbPath: g.thumb_path,
+      }));
+    setGenerateInitialState({ references: refs });
+    setGenerateOpen(true);
+  }, [markedIds, generations]);
+
+  const handleBatchRegen = useCallback(() => {
+    if (markedIds.size === 0) return;
+    // Use marked generations as refs, pre-fill from first selected
+    const markedGenerations = generations.filter((g) => markedIds.has(g.id));
+    if (markedGenerations.length === 0) return;
+    const first = markedGenerations[0];
+    const refs = markedGenerations.map((g) => ({
+      id: g.id,
+      path: g.image_path,
+      thumbPath: g.thumb_path,
+    }));
+    setGenerateInitialState({
+      prompt: first.prompt,
+      model: first.model,
+      tags: first.tags,
+      references: refs,
+    });
+    setGenerateOpen(true);
+  }, [markedIds, generations]);
+
   // Keyboard shortcuts
   useKeyboard({
     onNext: selectNext,
@@ -358,11 +470,22 @@ export default function App() {
         setDetailsOpen(false);
       } else if (generateOpen) {
         setGenerateOpen(false);
+      } else if (markedIds.size > 0 || batchTagOpen) {
+        setMarkedIds(new Set());
+        setBatchTagOpen(false);
       } else {
         setSelectedId(null);
       }
     },
     onDelete: handleTrash,
+    // Batch selection handlers
+    onMark: handleMark,
+    onClearSelection: handleClearSelection,
+    onBatchTag: () => setBatchTagOpen(true),
+    onBatchRefs: handleUseAsRefs,
+    onBatchRegen: handleBatchRegen,
+    onBatchDelete: handleBatchDelete,
+    hasSelection: markedIds.size > 0,
   }, (view === 'gallery' || showHelp) && !lightboxOpen);
 
   return (
@@ -430,11 +553,9 @@ export default function App() {
         <Gallery
           generations={generations}
           selectedId={selectedId}
+          markedIds={markedIds}
           thumbnailSize={thumbnailSize}
-          onSelect={(id) => {
-            setSelectedId(id);
-            setDetailsOpen(true);
-          }}
+          onSelect={handleSelect}
           onDoubleClick={(id) => {
             setSelectedId(id);
             setLightboxOpen(true);
@@ -541,6 +662,20 @@ export default function App() {
             setGenerateInitialState(undefined);
           }}
           onGenerate={handleGenerate}
+        />
+      )}
+
+      {markedIds.size > 0 && (
+        <BatchActionBar
+          count={markedIds.size}
+          availableTags={tags}
+          tagPopoverOpen={batchTagOpen}
+          onTagPopoverOpenChange={setBatchTagOpen}
+          onTag={handleBatchTag}
+          onUseAsRefs={handleUseAsRefs}
+          onRegen={handleBatchRegen}
+          onDelete={handleBatchDelete}
+          onClear={handleClearSelection}
         />
       )}
 

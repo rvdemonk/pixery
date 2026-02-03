@@ -5,12 +5,13 @@ import { getImageUrl } from '../lib/api';
 interface ThumbnailProps {
   generation: Generation;
   selected: boolean;
-  onClick: () => void;
+  marked?: boolean;
+  onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }
 
-export const Thumbnail = memo(function Thumbnail({ generation, selected, onClick, onDoubleClick, onContextMenu }: ThumbnailProps) {
+export const Thumbnail = memo(function Thumbnail({ generation, selected, marked, onClick, onDoubleClick, onContextMenu }: ThumbnailProps) {
   const imageSrc = generation.thumb_path
     ? getImageUrl(generation.thumb_path)
     : getImageUrl(generation.image_path);
@@ -26,6 +27,13 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, onClick
       onContextMenu={onContextMenu}
     >
       <img src={imageSrc} alt={generation.slug} loading="lazy" />
+      {marked && (
+        <span className="thumbnail-check">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
+      )}
       {generation.starred && <span className="thumbnail-star">★</span>}
       <span className="thumbnail-id">#{generation.id}</span>
       <div className="thumbnail-overlay">
@@ -51,6 +59,21 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, onClick
           display: block;
           width: 100%;
           height: auto;
+        }
+        .thumbnail-check {
+          position: absolute;
+          top: var(--spacing-xs);
+          left: var(--spacing-xs);
+          width: 20px;
+          height: 20px;
+          background: var(--success);
+          color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 3;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
         .thumbnail-star {
           position: absolute;

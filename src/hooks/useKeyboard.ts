@@ -13,6 +13,14 @@ interface KeyboardHandlers {
   onEscape?: () => void;
   onDelete?: () => void;
   onShowHelp?: () => void;
+  // Batch selection handlers
+  onMark?: () => void;
+  onClearSelection?: () => void;
+  onBatchTag?: () => void;
+  onBatchRefs?: () => void;
+  onBatchRegen?: () => void;
+  onBatchDelete?: () => void;
+  hasSelection?: boolean;
 }
 
 export function useKeyboard(handlers: KeyboardHandlers, enabled = true) {
@@ -42,9 +50,21 @@ export function useKeyboard(handlers: KeyboardHandlers, enabled = true) {
         e.preventDefault();
         handlers.onToggleStar?.();
         break;
+      case 'm':
+        e.preventDefault();
+        handlers.onMark?.();
+        break;
+      case 'u':
+        e.preventDefault();
+        handlers.onClearSelection?.();
+        break;
       case 't':
         e.preventDefault();
-        handlers.onFocusTags?.();
+        if (handlers.hasSelection && handlers.onBatchTag) {
+          handlers.onBatchTag();
+        } else {
+          handlers.onFocusTags?.();
+        }
         break;
       case 'Enter':
         e.preventDefault();
@@ -56,11 +76,19 @@ export function useKeyboard(handlers: KeyboardHandlers, enabled = true) {
         break;
       case 'r':
         e.preventDefault();
-        handlers.onRegenerate?.();
+        if (handlers.hasSelection && handlers.onBatchRefs) {
+          handlers.onBatchRefs();
+        } else {
+          handlers.onRegenerate?.();
+        }
         break;
       case 'g':
         e.preventDefault();
-        handlers.onFocusGenerate?.();
+        if (handlers.hasSelection && handlers.onBatchRegen) {
+          handlers.onBatchRegen();
+        } else {
+          handlers.onFocusGenerate?.();
+        }
         break;
       case '/':
         e.preventDefault();
@@ -76,7 +104,10 @@ export function useKeyboard(handlers: KeyboardHandlers, enabled = true) {
         break;
       case 'Delete':
       case 'Backspace':
-        if (e.metaKey || e.ctrlKey) {
+        if (handlers.hasSelection && handlers.onBatchDelete) {
+          e.preventDefault();
+          handlers.onBatchDelete();
+        } else if (e.metaKey || e.ctrlKey) {
           e.preventDefault();
           handlers.onDelete?.();
         }

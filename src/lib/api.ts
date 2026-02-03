@@ -35,6 +35,10 @@ export async function trashGeneration(id: number): Promise<boolean> {
   return invoke('trash_generation', { id });
 }
 
+export async function trashGenerations(ids: number[]): Promise<number> {
+  return invoke('trash_generations', { ids });
+}
+
 export async function restoreGeneration(id: number): Promise<boolean> {
   return invoke('restore_generation', { id });
 }

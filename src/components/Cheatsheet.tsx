@@ -8,13 +8,15 @@ const shortcuts = [
   { key: 'k / ↑', action: 'Previous image' },
   { key: 'Enter', action: 'Open details panel' },
   { key: 'f', action: 'Toggle starred' },
-  { key: 't', action: 'Focus tag input' },
-  { key: 'g', action: 'Open generate form' },
+  { key: 'm', action: 'Mark/unmark for batch actions' },
+  { key: 'u', action: 'Clear all marks' },
+  { key: 't', action: 'Tag (batch when marked)' },
+  { key: 'g', action: 'Generate (batch regen when marked)' },
+  { key: 'r', action: 'Remix / Use as refs (when marked)' },
   { key: '/', action: 'Focus filter bar' },
-  { key: 'r', action: 'Remix selected' },
   { key: 'c', action: 'Compare mode (2 selected)' },
-  { key: 'Esc', action: 'Close panel / clear selection' },
-  { key: '⌘/Ctrl + Del', action: 'Delete selected' },
+  { key: 'Esc', action: 'Close panel / clear marks' },
+  { key: 'Backspace', action: 'Delete marked (or ⌘+Del for single)' },
 ];
 
 export function Cheatsheet({ onClose }: CheatsheetProps) {

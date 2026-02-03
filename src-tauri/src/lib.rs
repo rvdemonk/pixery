@@ -30,6 +30,7 @@ pub fn run() {
             commands::get_generation,
             commands::toggle_starred,
             commands::trash_generation,
+            commands::trash_generations,
             commands::restore_generation,
             commands::permanently_delete_generation,
             commands::update_prompt,

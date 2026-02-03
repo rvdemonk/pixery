@@ -37,6 +37,24 @@ export function GenerateModal({
   const [tagsInput, setTagsInput] = useState(initialState?.tags?.join(', ') || '');
   const [selectedRefs, setSelectedRefs] = useState<SelectedRef[]>(initialState?.references || []);
 
+  // Check if model is compatible with current ref count
+  const isModelCompatible = (model: ModelInfo, refCount: number) => {
+    if (refCount === 0) return true;
+    return (model.max_refs ?? 0) >= refCount;
+  };
+
+  // Auto-switch to compatible model when refs change
+  useEffect(() => {
+    const currentModel = models.find((m) => m.id === selectedModel);
+    if (currentModel && !isModelCompatible(currentModel, selectedRefs.length)) {
+      // Find first compatible model
+      const compatibleModel = models.find((m) => isModelCompatible(m, selectedRefs.length));
+      if (compatibleModel) {
+        setSelectedModel(compatibleModel.id);
+      }
+    }
+  }, [selectedRefs.length, models, selectedModel]);
+
   // Gallery browser state
   const [searchQuery, setSearchQuery] = useState('');
   const [generations, setGenerations] = useState<Generation[]>([]);
@@ -174,12 +192,22 @@ export function GenerateModal({
                 onChange={(e) => setSelectedModel(e.target.value)}
                 className="genmodal-select"
               >
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.display_name} (${m.cost_per_image.toFixed(3)})
-                  </option>
-                ))}
+                {models.map((m) => {
+                  const compatible = isModelCompatible(m, selectedRefs.length);
+                  const maxRefs = m.max_refs ?? 0;
+                  return (
+                    <option key={m.id} value={m.id} disabled={!compatible}>
+                      {m.display_name} (${m.cost_per_image.toFixed(3)})
+                      {!compatible && ` - max ${maxRefs} ref${maxRefs !== 1 ? 's' : ''}`}
+                    </option>
+                  );
+                })}
               </select>
+              {selectedRefs.length > 0 && (
+                <span className="genmodal-hint" style={{ marginTop: '4px' }}>
+                  {selectedRefs.length} ref{selectedRefs.length !== 1 ? 's' : ''} selected - some models may be unavailable
+                </span>
+              )}
             </div>
 
             {/* Tags */}

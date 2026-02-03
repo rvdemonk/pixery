@@ -152,6 +152,12 @@ pub fn trash_generation(state: State<'_, AppState>, id: i64) -> Result<bool, Str
 }
 
 #[tauri::command]
+pub fn trash_generations(state: State<'_, AppState>, ids: Vec<i64>) -> Result<usize, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.trash_generations(&ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn restore_generation(state: State<'_, AppState>, id: i64) -> Result<bool, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.restore_generation(id).map_err(|e| e.to_string())
