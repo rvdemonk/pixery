@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 use crate::models::GenerationResult;
 
 const API_BASE: &str = "https://queue.fal.run";
-const POLL_INTERVAL_MS: u64 = 500;
-const MAX_POLL_ATTEMPTS: u32 = 240; // 2 minutes max
+const POLL_INTERVAL_MS: u64 = 1000; // 1 second between polls
+const MAX_POLL_ATTEMPTS: u32 = 300; // 5 minutes max (Ultra models queue longer)
 
 /// Model ID mapping for fal.ai models
 ///
@@ -115,7 +115,7 @@ pub async fn generate(
         .header("Authorization", format!("Key {}", api_key))
         .header("Content-Type", "application/json")
         .json(&request)
-        .timeout(std::time::Duration::from_secs(120))
+        .timeout(std::time::Duration::from_secs(300)) // 5 minutes - Ultra models can be slow
         .send()
         .await
         .context("Failed to send request to fal.ai API")?;
@@ -222,5 +222,6 @@ pub async fn generate(
         image_data,
         seed: data.seed.map(|s| s.to_string()),
         generation_time_seconds: elapsed,
+        cost_usd: None, // fal.ai doesn't return token-based billing
     })
 }

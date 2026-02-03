@@ -123,5 +123,6 @@ pub async fn generate(
         image_data,
         seed: None,
         generation_time_seconds: elapsed,
+        cost_usd: None, // OpenAI doesn't return token-based billing
     })
 }
