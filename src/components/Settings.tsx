@@ -270,7 +270,7 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
         .settings-container {
           background: var(--bg-secondary);
           border-radius: var(--radius-lg);
-          width: 400px;
+          width: 500px;
           max-height: 80vh;
           display: flex;
           flex-direction: column;
@@ -280,7 +280,7 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
           display: flex;
           align-items: center;
           gap: var(--spacing-sm);
-          padding: var(--spacing-md);
+          padding: var(--spacing-md) var(--spacing-lg);
           border-bottom: 1px solid var(--border);
         }
         .settings-header h2 {
@@ -305,13 +305,13 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
           padding: var(--spacing-xs) var(--spacing-sm);
         }
         .settings-content {
-          padding: var(--spacing-md);
+          padding: var(--spacing-lg) var(--spacing-xl);
           overflow-y: auto;
         }
         .settings-menu {
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: var(--spacing-sm);
         }
         .settings-menu-item {
           display: flex;
