@@ -99,7 +99,23 @@ Each model has its own default negative prompt configured in `server.py`.
 
 ---
 
+## Background SSH Tunnel
+
+For Claude-driven workflows, run the tunnel in background instead of interactive:
+
+```bash
+# Start tunnel (runs in background)
+ssh -f -N -p <PORT> root@<HOST> -L 8000:localhost:8000
+
+# Kill tunnel when done
+pkill -f "ssh.*<PORT>.*8000"
+```
+
+---
+
 ## Troubleshooting
+
+**Instance stuck on "loading"**: Some regions (Vietnam, others) can take 10+ minutes to pull the Docker image. If stuck, destroy and try a different machine — France/Norway/US tend to be faster.
 
 **"Connection refused"**: Server not running, or SSH missing `-L 8000:localhost:8000`
 

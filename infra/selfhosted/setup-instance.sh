@@ -25,15 +25,23 @@ echo "Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r /workspace/inference/requirements.txt
 
+# Helper: download from HuggingFace using Python (huggingface-cli not always in PATH)
+hf_download() {
+    local repo="$1"
+    local filename="$2"
+    local dest="$3"
+    python -c "
+from huggingface_hub import hf_hub_download
+hf_hub_download('$repo', '$filename', local_dir='$dest')
+"
+}
+
 # Download Animagine XL 4.0
 if [ "$MODELS_TO_DOWNLOAD" = "all" ] || [ "$MODELS_TO_DOWNLOAD" = "animagine" ]; then
     echo ""
     echo "Downloading Animagine XL 4.0 (~6.5 GB)..."
     if [ ! -f /workspace/models/animagine-xl-4.0.safetensors ]; then
-        huggingface-cli download cagliostrolab/animagine-xl-4.0 \
-            animagine-xl-4.0.safetensors \
-            --local-dir /workspace/models \
-            --local-dir-use-symlinks False
+        hf_download "cagliostrolab/animagine-xl-4.0" "animagine-xl-4.0.safetensors" "/workspace/models"
     else
         echo "  Already exists, skipping"
     fi
@@ -44,10 +52,7 @@ if [ "$MODELS_TO_DOWNLOAD" = "all" ] || [ "$MODELS_TO_DOWNLOAD" = "pony" ]; then
     echo ""
     echo "Downloading Pony Diffusion V6 XL (~6.5 GB)..."
     if [ ! -f /workspace/models/ponyDiffusionV6XL.safetensors ]; then
-        huggingface-cli download LyliaEngine/Pony_Diffusion_V6_XL \
-            ponyDiffusionV6XL.safetensors \
-            --local-dir /workspace/models \
-            --local-dir-use-symlinks False
+        hf_download "LyliaEngine/Pony_Diffusion_V6_XL" "ponyDiffusionV6XL.safetensors" "/workspace/models"
     else
         echo "  Already exists, skipping"
     fi
@@ -68,10 +73,7 @@ fi
 echo ""
 echo "Downloading IP-Adapter for SDXL (~1.5 GB)..."
 if [ ! -f /workspace/models/ip-adapter/ip-adapter-plus_sdxl_vit-h.safetensors ]; then
-    huggingface-cli download h94/IP-Adapter \
-        sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors \
-        --local-dir /workspace/models/ip-adapter \
-        --local-dir-use-symlinks False
+    hf_download "h94/IP-Adapter" "sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors" "/workspace/models/ip-adapter"
 else
     echo "  Already exists, skipping"
 fi

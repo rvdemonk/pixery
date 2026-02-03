@@ -48,6 +48,8 @@ High priority items to tackle next.
 
 Items to address when bandwidth allows.
 
+- [ ] `#feature` IP-Adapter for self-hosted Animagine - character consistency via reference images; weights downloaded, needs ~3.7GB CLIP image encoder + server.py integration
+
 - [ ] `#feature` Compare view - multi-select for side-by-side comparison (UI scaffolding exists, selection logic TODO)
 
 - [ ] `#feature` Regenerate with parent_id - track lineage when regenerating (DB schema ready, not wired up)
