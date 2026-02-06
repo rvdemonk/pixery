@@ -19,6 +19,7 @@ export interface Generation {
   created_at: string;
   trashed_at: string | null;
   title: string | null;
+  negative_prompt: string | null;
   tags: string[];
   references: Reference[];
 }
@@ -29,6 +30,16 @@ export interface GenerateParams {
   tags: string[];
   reference_paths: string[];
   copy_to: string | null;
+  negative_prompt: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+export interface Collection {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
 }
 
 export interface ListFilter {

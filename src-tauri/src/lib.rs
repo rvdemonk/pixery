@@ -6,6 +6,7 @@ pub mod db;
 pub mod models;
 pub mod providers;
 mod watcher;
+pub mod workflow;
 
 pub mod cli;
 
@@ -18,6 +19,18 @@ pub fn run() {
 
     // Open database
     let db = db::Database::open(&archive::db_path()).expect("Failed to open database");
+
+    // Cleanup stale job records on startup
+    if let Ok(stalled) = db.cleanup_stalled_jobs() {
+        if stalled > 0 {
+            eprintln!("Cleaned up {} stalled jobs", stalled);
+        }
+    }
+    if let Ok(old) = db.cleanup_old_jobs(24) {
+        if old > 0 {
+            eprintln!("Cleaned up {} old completed/failed jobs", old);
+        }
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -44,6 +57,10 @@ pub fn run() {
             commands::get_references,
             commands::list_jobs,
             commands::list_failed_jobs,
+            commands::list_collections,
+            commands::create_collection,
+            commands::add_to_collection,
+            commands::prompt_history,
             commands::get_selfhosted_url,
             commands::set_selfhosted_url,
             commands::check_selfhosted_health,

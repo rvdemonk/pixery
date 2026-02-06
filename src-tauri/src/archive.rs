@@ -205,18 +205,3 @@ pub fn delete_image(image_path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Load an image file as base64
-pub fn load_as_base64(path: &Path) -> Result<String> {
-    let data = fs::read(path).context("Failed to read image file")?;
-    Ok(base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data))
-}
-
-/// Get the MIME type for an image path
-pub fn mime_type(path: &Path) -> &'static str {
-    match path.extension().and_then(|e| e.to_str()) {
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("webp") => "image/webp",
-        Some("gif") => "image/gif",
-        _ => "image/png",
-    }
-}

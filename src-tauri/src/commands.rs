@@ -1,11 +1,10 @@
 use std::sync::Mutex;
 use tauri::State;
-use chrono::{Duration, Local, NaiveDate};
 
 use crate::archive;
 use crate::db::Database;
-use crate::models::{CostSummary, Generation, GenerateParams, Job, JobSource, ListFilter, ModelInfo, Reference, TagCount};
-use crate::providers;
+use crate::models::{self, CostSummary, Generation, GenerateParams, Job, JobSource, ListFilter, ModelInfo, Reference, TagCount};
+use crate::workflow;
 
 pub struct AppState {
     pub db: Mutex<Database>,
@@ -16,30 +15,29 @@ pub async fn generate_image(
     state: State<'_, AppState>,
     params: GenerateParams,
 ) -> Result<Generation, String> {
-    let model = &params.model;
-    let prompt = &params.prompt;
-    let reference_paths = &params.reference_paths;
-
-    // Get model info
-    let model_info = ModelInfo::find(model);
-    let estimated_cost = model_info.as_ref().map(|m| m.cost_per_image);
-    let provider = model_info
-        .as_ref()
-        .map(|m| m.provider.to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-
-    // Create job to track this generation
-    let job_id = {
+    // Phase 1: create job (lock, then drop before await)
+    let (job_id, estimated_cost, provider) = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
-        let tags_opt = if params.tags.is_empty() { None } else { Some(params.tags.as_slice()) };
-        let job_id = db.create_job(model, prompt, tags_opt, JobSource::Gui, reference_paths.len() as i32)
-            .map_err(|e| e.to_string())?;
-        db.update_job_started(job_id).map_err(|e| e.to_string())?;
-        job_id
+        workflow::prepare_generation(
+            &db,
+            &params.model,
+            &params.prompt,
+            &params.tags,
+            JobSource::Gui,
+            params.reference_paths.len(),
+        )
+        .map_err(|e| e.to_string())?
     };
 
-    // Generate image
-    let result = match providers::generate(model, prompt, reference_paths).await {
+    // Phase 2: async generation (no db lock held)
+    let result = match crate::providers::generate(
+        &params.model,
+        &params.prompt,
+        &params.reference_paths,
+        params.negative_prompt.as_deref(),
+        params.width,
+        params.height,
+    ).await {
         Ok(r) => r,
         Err(e) => {
             let db = state.db.lock().map_err(|e| e.to_string())?;
@@ -48,70 +46,32 @@ pub async fn generate_image(
         }
     };
 
-    // Save to archive
-    let now = chrono::Local::now();
-    let date = now.format("%Y-%m-%d").to_string();
-    let timestamp = now.format("%Y-%m-%dT%H:%M:%S").to_string();
-    let slug = archive::slugify_prompt(prompt);
-
-    let (image_path, thumb_path, width, height, file_size) =
-        archive::save_image(&result.image_data, &date, &slug, &timestamp)
-            .map_err(|e| e.to_string())?;
-
-    // Use actual cost from API response if available, otherwise use estimate
-    let cost = result.cost_usd.or(estimated_cost);
-
-    // Insert into database
+    // Phase 3: save results (lock again)
     let db = state.db.lock().map_err(|e| e.to_string())?;
-
-    let gen_id = db
-        .insert_generation(
-            &slug,
-            prompt,
-            model,
-            &provider,
-            &timestamp,
-            &date,
-            image_path.to_str().unwrap(),
-            thumb_path.as_ref().and_then(|p| p.to_str()),
-            Some(result.generation_time_seconds),
-            cost,
-            result.seed.as_deref(),
-            Some(width),
-            Some(height),
-            Some(file_size),
-            None, // parent_id
-        )
-        .map_err(|e| e.to_string())?;
-
-    // Add tags
-    if !params.tags.is_empty() {
-        db.add_tags(gen_id, &params.tags).map_err(|e| e.to_string())?;
-    }
-
-    // Store and link reference images
-    for ref_path in reference_paths {
-        let (hash, stored_path) = archive::store_reference(std::path::Path::new(ref_path))
-            .map_err(|e| e.to_string())?;
-        let ref_id = db
-            .get_or_create_reference(&hash, stored_path.to_str().unwrap())
-            .map_err(|e| e.to_string())?;
-        db.link_reference(gen_id, ref_id).map_err(|e| e.to_string())?;
-    }
-
-    // Mark job as completed
-    db.update_job_completed(job_id, gen_id).map_err(|e| e.to_string())?;
+    let (_gen_id, generation) = workflow::complete_generation(
+        &db,
+        job_id,
+        &params.prompt,
+        &params.model,
+        &provider,
+        &params.tags,
+        &params.reference_paths,
+        &result,
+        estimated_cost,
+        params.negative_prompt.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
 
     // Copy to destination if requested
     if let Some(ref dest) = params.copy_to {
-        archive::copy_to(&image_path, std::path::Path::new(dest))
-            .map_err(|e| e.to_string())?;
+        archive::copy_to(
+            std::path::Path::new(&generation.image_path),
+            std::path::Path::new(dest),
+        )
+        .map_err(|e| e.to_string())?;
     }
 
-    // Get the created generation
-    db.get_generation(gen_id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Failed to retrieve generation".to_string())
+    Ok(generation)
 }
 
 #[tauri::command]
@@ -215,49 +175,11 @@ pub fn get_cost_summary(
     since: Option<String>,
 ) -> Result<CostSummary, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    let since_date = parse_since(since.as_deref())?;
-    db.get_cost_summary(since_date.as_deref()).map_err(|e| e.to_string())
-}
-
-/// Parse a "since" string (e.g., "7d", "30d", "today") into a date string
-fn parse_since(since: Option<&str>) -> Result<Option<String>, String> {
-    let since = match since {
-        Some(s) => s,
-        None => return Ok(None),
+    let since_date = match since.as_deref() {
+        Some(s) => models::parse_since(s)?,
+        None => None,
     };
-
-    if since == "all" {
-        return Ok(None);
-    }
-
-    let now = Local::now().date_naive();
-
-    if since == "today" {
-        return Ok(Some(now.format("%Y-%m-%d").to_string()));
-    }
-
-    if since.ends_with('d') {
-        let days: i64 = since[..since.len() - 1]
-            .parse()
-            .map_err(|_| "Invalid days format")?;
-        let date = now - Duration::days(days);
-        return Ok(Some(date.format("%Y-%m-%d").to_string()));
-    }
-
-    if since.ends_with('w') {
-        let weeks: i64 = since[..since.len() - 1]
-            .parse()
-            .map_err(|_| "Invalid weeks format")?;
-        let date = now - Duration::weeks(weeks);
-        return Ok(Some(date.format("%Y-%m-%d").to_string()));
-    }
-
-    // Try parsing as a date
-    if let Ok(date) = NaiveDate::parse_from_str(since, "%Y-%m-%d") {
-        return Ok(Some(date.format("%Y-%m-%d").to_string()));
-    }
-
-    Err("Invalid since format. Use 'today', '7d', '2w', or 'YYYY-MM-DD'".to_string())
+    db.get_cost_summary(since_date.as_deref()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -283,6 +205,43 @@ pub fn list_jobs(state: State<'_, AppState>) -> Result<Vec<Job>, String> {
 pub fn list_failed_jobs(state: State<'_, AppState>, limit: Option<i64>) -> Result<Vec<Job>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.list_recent_failed_jobs(limit.unwrap_or(10)).map_err(|e| e.to_string())
+}
+
+// Collection commands
+
+#[tauri::command]
+pub fn list_collections(state: State<'_, AppState>) -> Result<Vec<models::Collection>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.list_collections().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_collection(
+    state: State<'_, AppState>,
+    name: String,
+    description: Option<String>,
+) -> Result<i64, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.create_collection(&name, description.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn add_to_collection(
+    state: State<'_, AppState>,
+    generation_id: i64,
+    collection_name: String,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.add_to_collection(generation_id, &collection_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn prompt_history(
+    state: State<'_, AppState>,
+    limit: i64,
+) -> Result<Vec<(i64, String, String)>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.prompt_history(limit).map_err(|e| e.to_string())
 }
 
 // Self-hosted server settings and health check commands

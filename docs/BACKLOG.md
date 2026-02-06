@@ -29,6 +29,16 @@ Items currently being worked on.
 
 High priority items to tackle next.
 
+- [ ] `#bug` Compare view does not close on Esc - wire Esc key to exit compare view back to gallery
+
+- [ ] `#ux` Generate modal references panel too tall - fixed 320px height pushes editor into scroll; reduce to ~120px or make collapsible so prompt/model/tags area has room
+
+- [ ] `#ux` Negative prompt only for models that use it - detect from ModelInfo or PromptingGuide whether a model supports negative prompts (selfhosted SDXL models do, Gemini/OpenAI/fal don't); only show Advanced section when relevant model is selected
+
+- [ ] `#ux` Prompt autocomplete improvements - show generation title alongside prompt for recognition (prompts are often too long); respect hidden tags (never suggest prompts from generations tagged with actively-hidden tags)
+
+- [ ] `#ux` Collection creation in GUI - add "+" button in sidebar collections section to create new collections; also add "Add to collection" in details panel and batch action bar
+
 - [ ] `#ux` Details close button - make X button larger, follow best practices for dismiss targets
 
 - [ ] `#ux` Shared close button component - create reusable X button for all closeable elements (cost dashboard, popups, detail column)
@@ -50,8 +60,6 @@ Items to address when bandwidth allows.
 
 - [ ] `#feature` IP-Adapter for self-hosted Animagine - character consistency via reference images; weights downloaded, needs ~3.7GB CLIP image encoder + server.py integration
 
-- [ ] `#feature` Compare view - multi-select for side-by-side comparison (UI scaffolding exists, selection logic TODO)
-
 - [ ] `#feature` Regenerate with parent_id - track lineage when regenerating (DB schema ready, not wired up)
 
 - [ ] `#feature` Notifications - alert when background generation completes (plugin configured, not implemented)
@@ -65,7 +73,6 @@ Items to address when bandwidth allows.
 
 Ideas and features for future consideration.
 
-- [ ] `#feature` Batch generation - generate multiple variations with one command
 - [ ] `#feature` Image editing/inpainting support
 - [ ] `#feature` Cost tracking and reporting
 - [ ] `#feature` Tag management UI in sidebar
@@ -80,6 +87,16 @@ Ideas and features for future consideration.
 Items shipped, organized by version.
 
 ### Unreleased
+- [x] Compare view wired - Cmd+click 2 images, "Compare" button in batch bar, `c` keyboard shortcut
+- [x] Negative prompt support - full stack: DB column, CLI `--negative` flag, provider passthrough, GUI Advanced section in GenerateModal
+- [x] Aspect ratio presets - `pixery generate --ratio portrait` with SDXL native resolutions; fal.ai maps to image_size names
+- [x] `pixery batch` - generate N images from same prompt sequentially
+- [x] `pixery export` - copy images by ID/tag to output dir with optional metadata.json sidecar
+- [x] `pixery collection` - create/list/add/remove/delete project folders; DB tables, CLI subcommands, GUI sidebar display
+- [x] `pixery history` - show recent prompts with generation IDs
+- [x] Prompt autocomplete in GenerateModal - fetches recent prompts, substring match dropdown
+- [x] Self-hosted server: FastAPI lifespan migration, auto-shutdown watchdog (60min idle), /switch-model pre-warming, LoRA support
+- [x] Shared reqwest client via OnceLock, parse_job_row extraction, batch tag/ref queries (N+1 fix), shared parse_since/mime_type/image_to_base64
 - [x] CLI help improvements for Claude-as-user workflow - `pixery models MODEL --guide` outputs prompting guides (prose vs tags vs hybrid, required prefixes, negative templates, examples); main help shows workflow/iteration patterns; `view` recommends 600px width; `list` documents output columns; `show`/`view` descriptions clarified
 - [x] Server-side hidden tag filtering with infinite scroll - exclude_tags filter at DB level replaces client-side filtering; pagination (50/page) with IntersectionObserver auto-loads more on scroll
 - [x] Batch actions with multi-selection - Cmd/Ctrl+click toggles mark, Shift+click range selects; floating action bar for tag/delete/use-as-refs/regen; `m` key marks focused item; `u` clears selection; models auto-disabled when ref count exceeds max_refs

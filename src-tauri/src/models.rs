@@ -1,3 +1,4 @@
+use chrono::{Duration, Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 
 /// Supported image generation providers
@@ -372,6 +373,7 @@ pub struct Generation {
     pub created_at: String,
     pub trashed_at: Option<String>,
     pub title: Option<String>,
+    pub negative_prompt: Option<String>,
     pub tags: Vec<String>,
     pub references: Vec<Reference>,
 }
@@ -384,6 +386,9 @@ pub struct GenerateParams {
     pub tags: Vec<String>,
     pub reference_paths: Vec<String>,
     pub copy_to: Option<String>,
+    pub negative_prompt: Option<String>,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
 }
 
 /// Reference image (deduplicated by hash)
@@ -513,4 +518,64 @@ pub struct Job {
     pub completed_at: Option<String>,
     pub generation_id: Option<i64>,
     pub error: Option<String>,
+}
+
+/// Resolve a user-friendly aspect ratio name to pixel dimensions (SDXL native ~1M pixels)
+pub fn resolve_aspect_ratio(ratio: &str) -> Option<(i32, i32)> {
+    match ratio {
+        "square" | "1:1" => Some((1024, 1024)),
+        "portrait" | "2:3" => Some((832, 1216)),
+        "landscape" | "3:2" => Some((1216, 832)),
+        "wide" | "16:9" => Some((1344, 768)),
+        "tall" | "9:16" => Some((768, 1344)),
+        "4:3" => Some((1152, 896)),
+        "3:4" => Some((896, 1152)),
+        _ => None,
+    }
+}
+
+/// A named collection (project folder) for grouping generations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Collection {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: String,
+}
+
+/// Parse a "since" string (e.g., "7d", "30d", "today", "all") into a date string.
+/// Returns None for "all" or missing input.
+pub fn parse_since(since: &str) -> Result<Option<String>, String> {
+    if since == "all" {
+        return Ok(None);
+    }
+
+    let now = Local::now().date_naive();
+
+    if since == "today" {
+        return Ok(Some(now.format("%Y-%m-%d").to_string()));
+    }
+
+    if since.ends_with('d') {
+        let days: i64 = since[..since.len() - 1]
+            .parse()
+            .map_err(|_| "Invalid days format".to_string())?;
+        let date = now - Duration::days(days);
+        return Ok(Some(date.format("%Y-%m-%d").to_string()));
+    }
+
+    if since.ends_with('w') {
+        let weeks: i64 = since[..since.len() - 1]
+            .parse()
+            .map_err(|_| "Invalid weeks format".to_string())?;
+        let date = now - Duration::weeks(weeks);
+        return Ok(Some(date.format("%Y-%m-%d").to_string()));
+    }
+
+    // Try parsing as a date
+    if let Ok(date) = NaiveDate::parse_from_str(since, "%Y-%m-%d") {
+        return Ok(Some(date.format("%Y-%m-%d").to_string()));
+    }
+
+    Err("Invalid since format. Use 'today', '7d', '2w', or 'YYYY-MM-DD'".to_string())
 }

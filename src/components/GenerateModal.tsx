@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { Generation, ModelInfo } from '../lib/types';
-import { getImageUrl } from '../lib/api';
+import { getImageUrl, promptHistory } from '../lib/api';
 import * as api from '../lib/api';
 
 interface SelectedRef {
@@ -22,7 +22,7 @@ interface GenerateModalProps {
   models: ModelInfo[];
   initialState?: GenerateModalInitialState;
   onClose: () => void;
-  onGenerate: (prompt: string, model: string, tags: string[], referencePaths: string[]) => void;
+  onGenerate: (prompt: string, model: string, tags: string[], referencePaths: string[], negativePrompt: string | null) => void;
 }
 
 export function GenerateModal({
@@ -33,9 +33,18 @@ export function GenerateModal({
 }: GenerateModalProps) {
   // Form state
   const [prompt, setPrompt] = useState(initialState?.prompt || '');
+  const [negativePrompt, setNegativePrompt] = useState('');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(initialState?.model || models[0]?.id || '');
   const [tagsInput, setTagsInput] = useState(initialState?.tags?.join(', ') || '');
   const [selectedRefs, setSelectedRefs] = useState<SelectedRef[]>(initialState?.references || []);
+
+  // Prompt autocomplete
+  const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Check if model is compatible with current ref count
   const isModelCompatible = (model: ModelInfo, refCount: number) => {
@@ -54,6 +63,62 @@ export function GenerateModal({
       }
     }
   }, [selectedRefs.length, models, selectedModel]);
+
+  // Fetch recent prompts on mount
+  useEffect(() => {
+    promptHistory(50).then((rows) => {
+      // Deduplicate prompts, keep most recent
+      const seen = new Set<string>();
+      const unique: string[] = [];
+      for (const [, p] of rows) {
+        const lower = p.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          unique.push(p);
+        }
+      }
+      setRecentPrompts(unique);
+    }).catch(() => {});
+  }, []);
+
+  // Update suggestions as user types
+  const updateSuggestions = useCallback((value: string) => {
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const lower = value.toLowerCase();
+    const matches = recentPrompts
+      .filter((p) => p.toLowerCase().includes(lower) && p.toLowerCase() !== lower)
+      .slice(0, 5);
+    setSuggestions(matches);
+    setShowSuggestions(matches.length > 0);
+  }, [recentPrompts]);
+
+  const handlePromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setPrompt(value);
+    updateSuggestions(value);
+  }, [updateSuggestions]);
+
+  const handleSelectSuggestion = useCallback((suggestion: string) => {
+    setPrompt(suggestion);
+    setShowSuggestions(false);
+    promptRef.current?.focus();
+  }, []);
+
+  // Close suggestions on click outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+          promptRef.current && !promptRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   // Gallery browser state
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,7 +188,7 @@ export function GenerateModal({
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    onGenerate(prompt, selectedModel, tags, referencePaths);
+    onGenerate(prompt, selectedModel, tags, referencePaths, negativePrompt.trim() || null);
   };
 
   const lineageRefs = initialState?.lineage || [];
@@ -254,13 +319,51 @@ export function GenerateModal({
             {/* Prompt */}
             <div className="genmodal-section genmodal-prompt-section">
               <label className="genmodal-label">Prompt</label>
-              <textarea
-                className="genmodal-prompt"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe what you want to generate..."
-                autoFocus
-              />
+              <div className="genmodal-prompt-wrapper">
+                <textarea
+                  ref={promptRef}
+                  className="genmodal-prompt"
+                  value={prompt}
+                  onChange={handlePromptChange}
+                  onFocus={() => updateSuggestions(prompt)}
+                  placeholder="Describe what you want to generate..."
+                  autoFocus
+                />
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="genmodal-suggestions" ref={suggestionsRef}>
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        className="genmodal-suggestion"
+                        onClick={() => handleSelectSuggestion(s)}
+                      >
+                        {s.length > 80 ? s.slice(0, 80) + '...' : s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Advanced */}
+            <div className="genmodal-section">
+              <button
+                className="genmodal-advanced-toggle"
+                onClick={() => setAdvancedOpen(!advancedOpen)}
+              >
+                {advancedOpen ? '▾' : '▸'} Advanced
+              </button>
+              {advancedOpen && (
+                <div className="genmodal-advanced">
+                  <label className="genmodal-label">Negative Prompt</label>
+                  <textarea
+                    className="genmodal-negative-prompt"
+                    value={negativePrompt}
+                    onChange={(e) => setNegativePrompt(e.target.value)}
+                    placeholder="Things to avoid..."
+                  />
+                </div>
+              )}
             </div>
 
             {/* Generate button */}
@@ -656,6 +759,84 @@ export function GenerateModal({
           max-height: 180px;
           object-fit: contain;
           border-radius: var(--radius-sm);
+        }
+
+        /* Prompt wrapper for autocomplete */
+        .genmodal-prompt-wrapper {
+          position: relative;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .genmodal-prompt-wrapper .genmodal-prompt {
+          flex: 1;
+        }
+
+        .genmodal-suggestions {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          box-shadow: var(--shadow-lg);
+          z-index: 10;
+          max-height: 200px;
+          overflow-y: auto;
+        }
+
+        .genmodal-suggestion {
+          display: block;
+          width: 100%;
+          padding: var(--spacing-sm) var(--spacing-md);
+          text-align: left;
+          color: var(--text-secondary);
+          font-size: 13px;
+          line-height: 1.4;
+          cursor: pointer;
+          transition: background var(--transition-fast);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .genmodal-suggestion:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
+        }
+
+        /* Advanced section */
+        .genmodal-advanced-toggle {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-xs);
+          color: var(--text-muted);
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          cursor: pointer;
+          transition: color var(--transition-fast);
+        }
+
+        .genmodal-advanced-toggle:hover {
+          color: var(--text-primary);
+        }
+
+        .genmodal-advanced {
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-xs);
+          margin-top: var(--spacing-xs);
+        }
+
+        .genmodal-negative-prompt {
+          min-height: 60px;
+          resize: vertical;
+          font-size: 13px;
+          line-height: 1.5;
+          padding: var(--spacing-sm) var(--spacing-md);
         }
       `}</style>
     </div>

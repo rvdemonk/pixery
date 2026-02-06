@@ -259,6 +259,9 @@ export default function App() {
       tags,
       reference_paths: referencePaths,
       copy_to: null,
+      negative_prompt: null,
+      width: null,
+      height: null,
     });
     if (result) {
       refresh();
@@ -313,7 +316,7 @@ export default function App() {
     refresh();
   }, [selectedId, refresh]);
 
-  const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[], referencePaths: string[]) => {
+  const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[], referencePaths: string[], negativePrompt: string | null = null) => {
     setGenerateOpen(false);
     const result = await generate({
       prompt,
@@ -321,6 +324,9 @@ export default function App() {
       tags: genTags,
       reference_paths: referencePaths,
       copy_to: null,
+      negative_prompt: negativePrompt,
+      width: null,
+      height: null,
     });
     if (result) {
       refresh();
@@ -419,6 +425,14 @@ export default function App() {
     setGenerateOpen(true);
   }, [markedIds, generations]);
 
+  const handleCompare = useCallback(() => {
+    if (markedIds.size === 2) {
+      const ids = [...markedIds] as [number, number];
+      setCompareIds(ids);
+      setView('compare');
+    }
+  }, [markedIds]);
+
   const handleBatchRegen = useCallback(() => {
     if (markedIds.size === 0) return;
     // Use marked generations as refs, pre-fill from first selected
@@ -446,7 +460,11 @@ export default function App() {
     onToggleStar: handleToggleStar,
     onOpenDetails: () => selectedId && setDetailsOpen(true),
     onCompare: () => {
-      // TODO: implement multi-select for compare
+      if (markedIds.size === 2) {
+        const ids = [...markedIds] as [number, number];
+        setCompareIds(ids);
+        setView('compare');
+      }
     },
     onRegenerate: handleOpenRemix,
     onFocusGenerate: () => {
@@ -471,13 +489,13 @@ export default function App() {
       } else if (view !== 'gallery') {
         setView('gallery');
         setCompareIds(null);
+      } else if (markedIds.size > 0 || batchTagOpen) {
+        setMarkedIds(new Set());
+        setBatchTagOpen(false);
       } else if (detailsOpen) {
         setDetailsOpen(false);
       } else if (generateOpen) {
         setGenerateOpen(false);
-      } else if (markedIds.size > 0 || batchTagOpen) {
-        setMarkedIds(new Set());
-        setBatchTagOpen(false);
       } else {
         setSelectedId(null);
       }
@@ -682,6 +700,7 @@ export default function App() {
           onTag={handleBatchTag}
           onUseAsRefs={handleUseAsRefs}
           onRegen={handleBatchRegen}
+          onCompare={handleCompare}
           onDelete={handleBatchDelete}
           onClear={handleClearSelection}
         />

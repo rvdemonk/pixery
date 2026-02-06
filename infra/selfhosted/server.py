@@ -6,12 +6,16 @@ Supports multiple SDXL fine-tunes: Animagine, Pony, NoobAI.
 Designed for pixery integration.
 """
 
+import asyncio
 import io
+import os
 import base64
+import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 import torch
 from diffusers import StableDiffusionXLPipeline, EulerAncestralDiscreteScheduler
@@ -22,6 +26,9 @@ MODEL_DIR = Path("/workspace/models")
 IP_ADAPTER_DIR = MODEL_DIR / "ip-adapter"
 LORA_DIR = MODEL_DIR / "loras"
 IP_ADAPTER_MODEL = IP_ADAPTER_DIR / "sdxl_models" / "ip-adapter-plus_sdxl_vit-h.safetensors"
+
+# Auto-shutdown: idle timeout in minutes (0 = disabled)
+IDLE_TIMEOUT_MINUTES = int(os.environ.get("IDLE_TIMEOUT_MINUTES", "60"))
 
 # Available models - add more as needed
 # Each model has its own default negative prompt tuned for its training data
@@ -51,12 +58,58 @@ AVAILABLE_MODELS = {
 
 DEFAULT_MODEL = "animagine"
 
-app = FastAPI(title="SDXL Inference Server")
-
 # Global state
 loaded_models: dict[str, StableDiffusionXLPipeline] = {}
 current_model: Optional[str] = None
 ip_adapter_loaded = False
+last_request_time: float = time.time()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: preload default model. Shutdown: cleanup."""
+    # Startup
+    default_checkpoint = MODEL_DIR / AVAILABLE_MODELS[DEFAULT_MODEL]["file"]
+    if default_checkpoint.exists():
+        load_model(DEFAULT_MODEL)
+    else:
+        print(f"Default model not found. Available models will load on first request.")
+        print(f"Run setup-instance.sh to download models.")
+
+    # Start idle watchdog if timeout is configured
+    watchdog_task = None
+    if IDLE_TIMEOUT_MINUTES > 0:
+        watchdog_task = asyncio.create_task(_idle_watchdog())
+        print(f"Idle watchdog enabled: auto-shutdown after {IDLE_TIMEOUT_MINUTES} minutes of inactivity")
+
+    yield
+
+    # Shutdown
+    if watchdog_task:
+        watchdog_task.cancel()
+
+
+async def _idle_watchdog():
+    """Background task: exit if no requests received within timeout."""
+    timeout_seconds = IDLE_TIMEOUT_MINUTES * 60
+    while True:
+        await asyncio.sleep(60)
+        idle_seconds = time.time() - last_request_time
+        if idle_seconds >= timeout_seconds:
+            idle_mins = int(idle_seconds // 60)
+            print(f"Idle for {idle_mins} minutes (timeout: {IDLE_TIMEOUT_MINUTES}). Shutting down.")
+            os._exit(0)
+
+
+app = FastAPI(title="SDXL Inference Server", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def track_request_time(request: Request, call_next):
+    """Track last request time for idle watchdog."""
+    global last_request_time
+    last_request_time = time.time()
+    return await call_next(request)
 
 
 class GenerateRequest(BaseModel):
@@ -80,6 +133,10 @@ class GenerateResponse(BaseModel):
     image: str  # Base64 encoded PNG
     seed: int
     parameters: dict
+
+
+class SwitchModelRequest(BaseModel):
+    model: str = Field(description="Model to load: animagine, pony, noobai")
 
 
 def load_model(model_name: str) -> StableDiffusionXLPipeline:
@@ -139,20 +196,10 @@ def load_model(model_name: str) -> StableDiffusionXLPipeline:
     return pipe
 
 
-@app.on_event("startup")
-async def startup():
-    """Preload default model at startup."""
-    default_checkpoint = MODEL_DIR / AVAILABLE_MODELS[DEFAULT_MODEL]["file"]
-    if default_checkpoint.exists():
-        load_model(DEFAULT_MODEL)
-    else:
-        print(f"Default model not found. Available models will load on first request.")
-        print(f"Run setup-instance.sh to download models.")
-
-
 @app.get("/health")
 async def health():
     """Health check endpoint."""
+    idle_seconds = time.time() - last_request_time
     return {
         "status": "healthy" if current_model else "no_model_loaded",
         "current_model": current_model,
@@ -161,6 +208,8 @@ async def health():
         "cuda_available": torch.cuda.is_available(),
         "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         "vram_allocated_gb": round(torch.cuda.memory_allocated() / 1e9, 2) if torch.cuda.is_available() else None,
+        "idle_seconds": round(idle_seconds, 1),
+        "idle_timeout_minutes": IDLE_TIMEOUT_MINUTES,
     }
 
 
@@ -187,6 +236,19 @@ async def list_loras():
         return {"loras": []}
     loras = [f.stem for f in LORA_DIR.glob("*.safetensors")]
     return {"loras": loras}
+
+
+@app.post("/switch-model")
+async def switch_model(request: SwitchModelRequest):
+    """Pre-load a model without generating an image."""
+    try:
+        load_model(request.model)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"status": "ok", "model": request.model}
 
 
 @app.post("/generate", response_model=GenerateResponse)
@@ -228,11 +290,17 @@ async def generate(request: GenerateRequest):
     elif request.reference_image and not ip_adapter_loaded:
         print("Warning: Reference image provided but IP-Adapter not loaded")
 
-    # TODO: LoRA loading
-    # if request.lora_name:
-    #     lora_path = LORA_DIR / f"{request.lora_name}.safetensors"
-    #     pipe.load_lora_weights(str(lora_path))
-    #     pipe.fuse_lora(lora_scale=request.lora_scale)
+    # LoRA loading
+    if request.lora_name:
+        lora_path = LORA_DIR / f"{request.lora_name}.safetensors"
+        if not lora_path.exists():
+            raise HTTPException(
+                status_code=400,
+                detail=f"LoRA not found: {request.lora_name}. Available: {[f.stem for f in LORA_DIR.glob('*.safetensors')]}"
+            )
+        pipe.load_lora_weights(str(lora_path))
+        pipe.fuse_lora(lora_scale=request.lora_scale)
+        print(f"LoRA '{request.lora_name}' loaded with scale {request.lora_scale}")
 
     # Generate
     gen_kwargs = {
@@ -248,6 +316,11 @@ async def generate(request: GenerateRequest):
         gen_kwargs["ip_adapter_image"] = ip_adapter_image
 
     image = pipe(**gen_kwargs).images[0]
+
+    # Unfuse LoRA after generation to avoid affecting subsequent requests
+    if request.lora_name:
+        pipe.unfuse_lora()
+        pipe.unload_lora_weights()
 
     # Encode to base64
     buffer = io.BytesIO()

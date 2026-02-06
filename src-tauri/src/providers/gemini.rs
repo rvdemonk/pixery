@@ -137,6 +137,9 @@ pub async fn generate(
     model: &str,
     prompt: &str,
     reference_paths: &[String],
+    _negative_prompt: Option<&str>,
+    _width: Option<i32>,
+    _height: Option<i32>,
 ) -> Result<GenerationResult> {
     let api_key = get_api_key()?;
     let model_id = resolve_model(model);
@@ -172,7 +175,7 @@ pub async fn generate(
     };
 
     let url = format!("{}/{}:generateContent", API_BASE, model_id);
-    let client = reqwest::Client::new();
+    let client = super::client();
 
     let start = Instant::now();
     let response = client

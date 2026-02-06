@@ -13,6 +13,8 @@ struct SelfHostedRequest {
     prompt: String,
     model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    negative_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     width: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     height: Option<i32>,
@@ -20,6 +22,10 @@ struct SelfHostedRequest {
     reference_image: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ip_adapter_scale: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lora_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lora_scale: Option<f64>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -77,7 +83,7 @@ pub fn set_server_url(url: Option<&str>) -> Result<()> {
 /// Check if the self-hosted server is healthy
 pub async fn check_health(url: &str) -> Result<HealthResponse> {
     let health_url = format!("{}/health", url.trim_end_matches('/'));
-    let client = reqwest::Client::new();
+    let client = super::client();
 
     let response = client
         .get(&health_url)
@@ -103,6 +109,9 @@ pub async fn generate(
     model: &str,
     prompt: &str,
     reference_paths: &[String],
+    negative_prompt: Option<&str>,
+    width: Option<i32>,
+    height: Option<i32>,
 ) -> Result<GenerationResult> {
     let base_url = get_server_url()
         .ok_or_else(|| anyhow::anyhow!("Self-hosted server URL not configured"))?;
@@ -126,14 +135,17 @@ pub async fn generate(
     let request = SelfHostedRequest {
         prompt: prompt.to_string(),
         model: model.to_string(),
-        width: Some(1024),
-        height: Some(1024),
+        negative_prompt: negative_prompt.map(|s| s.to_string()),
+        width: Some(width.unwrap_or(1024)),
+        height: Some(height.unwrap_or(1024)),
         reference_image,
         ip_adapter_scale,
+        lora_name: None,
+        lora_scale: None,
     };
 
     let url = format!("{}/generate", base_url.trim_end_matches('/'));
-    let client = reqwest::Client::new();
+    let client = super::client();
 
     let start = Instant::now();
     let response = client

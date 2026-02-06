@@ -9,6 +9,7 @@ import type {
   Reference,
   Job,
   SelfHostedStatus,
+  Collection,
 } from './types';
 
 export async function generateImage(params: GenerateParams): Promise<Generation> {
@@ -104,4 +105,24 @@ export async function setSelfhostedUrl(url: string | null): Promise<void> {
 
 export async function checkSelfhostedHealth(): Promise<SelfHostedStatus> {
   return invoke('check_selfhosted_health');
+}
+
+// Prompt history
+
+export async function promptHistory(limit: number): Promise<[number, string, string][]> {
+  return invoke('prompt_history', { limit });
+}
+
+// Collections
+
+export async function listCollections(): Promise<Collection[]> {
+  return invoke('list_collections');
+}
+
+export async function createCollection(name: string, description?: string): Promise<Collection> {
+  return invoke('create_collection', { name, description });
+}
+
+export async function addToCollection(generationId: number, collectionName: string): Promise<void> {
+  return invoke('add_to_collection', { generationId, collectionName });
 }

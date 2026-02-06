@@ -1,7 +1,15 @@
 use anyhow::Result;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use crate::models::{GenerationResult, ModelInfo, Provider};
+
+static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
+/// Shared HTTP client for all providers (enables connection pooling)
+pub fn client() -> &'static reqwest::Client {
+    HTTP_CLIENT.get_or_init(reqwest::Client::new)
+}
 
 pub mod fal;
 pub mod gemini;
@@ -13,6 +21,9 @@ pub async fn generate(
     model: &str,
     prompt: &str,
     reference_paths: &[String],
+    negative_prompt: Option<&str>,
+    width: Option<i32>,
+    height: Option<i32>,
 ) -> Result<GenerationResult> {
     let provider = ModelInfo::provider_for_model(model)
         .or_else(|| {
@@ -26,10 +37,10 @@ pub async fn generate(
         .ok_or_else(|| anyhow::anyhow!("Unknown model: {}", model))?;
 
     match provider {
-        Provider::Gemini => gemini::generate(model, prompt, reference_paths).await,
-        Provider::Fal => fal::generate(model, prompt, reference_paths).await,
-        Provider::OpenAI => openai::generate(model, prompt, reference_paths).await,
-        Provider::SelfHosted => selfhosted::generate(model, prompt, reference_paths).await,
+        Provider::Gemini => gemini::generate(model, prompt, reference_paths, negative_prompt, width, height).await,
+        Provider::Fal => fal::generate(model, prompt, reference_paths, negative_prompt, width, height).await,
+        Provider::OpenAI => openai::generate(model, prompt, reference_paths, negative_prompt, width, height).await,
+        Provider::SelfHosted => selfhosted::generate(model, prompt, reference_paths, negative_prompt, width, height).await,
     }
 }
 

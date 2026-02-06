@@ -1,4 +1,6 @@
-import type { TagCount } from '../lib/types';
+import { useState, useEffect } from 'react';
+import type { TagCount, Collection } from '../lib/types';
+import { listCollections } from '../lib/api';
 
 interface SidebarProps {
   tags: TagCount[];
@@ -23,6 +25,12 @@ export function Sidebar({
   pinned,
   onTogglePin,
 }: SidebarProps) {
+  const [collections, setCollections] = useState<Collection[]>([]);
+
+  useEffect(() => {
+    listCollections().then(setCollections).catch(() => {});
+  }, []);
+
   return (
     <aside className={`sidebar ${pinned ? 'sidebar-pinned' : ''}`}>
       <button className="sidebar-hamburger" onClick={onTogglePin} title={pinned ? 'Collapse sidebar' : 'Pin sidebar'}>
@@ -55,6 +63,19 @@ export function Sidebar({
             <span>★ Starred</span>
           </button>
         </div>
+
+        {collections.length > 0 && (
+          <div className="sidebar-section">
+            <h3 className="sidebar-section-title">Collections</h3>
+            <div className="sidebar-collections">
+              {collections.map((col) => (
+                <div key={col.id} className="sidebar-item sidebar-collection">
+                  <span className="truncate">{col.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="sidebar-section">
           <h3 className="sidebar-section-title">Tags</h3>
@@ -173,6 +194,14 @@ export function Sidebar({
           padding: var(--spacing-sm) var(--spacing-md);
           color: var(--text-muted);
           font-size: 13px;
+        }
+        .sidebar-collections {
+          max-height: 200px;
+          overflow-y: auto;
+        }
+        .sidebar-collection {
+          cursor: default;
+          color: var(--text-secondary);
         }
         .sidebar-footer {
           margin-top: auto;

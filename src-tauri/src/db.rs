@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection, OptionalExtension};
+use std::collections::HashMap;
 use std::path::Path;
 
-use crate::models::{CostSummary, Generation, Job, JobSource, JobStatus, ListFilter, Reference, TagCount};
+use crate::models::{Collection, CostSummary, Generation, Job, JobSource, JobStatus, ListFilter, Reference, TagCount};
 
 const SCHEMA: &str = r#"
 -- Core generations table
@@ -79,7 +80,49 @@ CREATE TABLE IF NOT EXISTS generation_jobs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON generation_jobs(status);
+
+-- Performance indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_gen_trashed ON generations(trashed_at);
+CREATE INDEX IF NOT EXISTS idx_gen_tags_genid ON generation_tags(generation_id);
+CREATE INDEX IF NOT EXISTS idx_gen_model_ts ON generations(model, timestamp DESC);
+
+-- Collections (project folders)
+CREATE TABLE IF NOT EXISTS collections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS generation_collections (
+    generation_id INTEGER REFERENCES generations(id) ON DELETE CASCADE,
+    collection_id INTEGER REFERENCES collections(id) ON DELETE CASCADE,
+    PRIMARY KEY (generation_id, collection_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gc_collection ON generation_collections(collection_id);
 "#;
+
+fn parse_job_row(row: &rusqlite::Row) -> rusqlite::Result<Job> {
+    let status_str: String = row.get(1)?;
+    let source_str: String = row.get(5)?;
+    let tags_json: Option<String> = row.get(4)?;
+
+    Ok(Job {
+        id: row.get(0)?,
+        status: status_str.parse().unwrap_or(JobStatus::Pending),
+        model: row.get(2)?,
+        prompt: row.get(3)?,
+        tags: tags_json.and_then(|s| serde_json::from_str(&s).ok()),
+        source: source_str.parse().unwrap_or(JobSource::Cli),
+        ref_count: row.get(6)?,
+        created_at: row.get(7)?,
+        started_at: row.get(8)?,
+        completed_at: row.get(9)?,
+        generation_id: row.get(10)?,
+        error: row.get(11)?,
+    })
+}
 
 pub struct Database {
     conn: Connection,
@@ -112,6 +155,12 @@ impl Database {
             [],
         );
 
+        // Add negative_prompt column if it doesn't exist
+        let _ = self.conn.execute(
+            "ALTER TABLE generations ADD COLUMN negative_prompt TEXT",
+            [],
+        );
+
         Ok(())
     }
 
@@ -132,11 +181,12 @@ impl Database {
         height: Option<i32>,
         file_size: Option<i64>,
         parent_id: Option<i64>,
+        negative_prompt: Option<&str>,
     ) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO generations (slug, prompt, model, provider, timestamp, date, image_path, thumb_path, generation_time_seconds, cost_estimate_usd, seed, width, height, file_size, parent_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
-            params![slug, prompt, model, provider, timestamp, date, image_path, thumb_path, generation_time, cost, seed, width, height, file_size, parent_id],
+            "INSERT INTO generations (slug, prompt, model, provider, timestamp, date, image_path, thumb_path, generation_time_seconds, cost_estimate_usd, seed, width, height, file_size, parent_id, negative_prompt)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+            params![slug, prompt, model, provider, timestamp, date, image_path, thumb_path, generation_time, cost, seed, width, height, file_size, parent_id, negative_prompt],
         ).context("Failed to insert generation")?;
         Ok(self.conn.last_insert_rowid())
     }
@@ -145,7 +195,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT id, slug, prompt, model, provider, timestamp, date, image_path, thumb_path,
                     generation_time_seconds, cost_estimate_usd, seed, width, height, file_size,
-                    parent_id, starred, created_at, trashed_at, title
+                    parent_id, starred, created_at, trashed_at, title, negative_prompt
              FROM generations WHERE id = ?1",
         )?;
 
@@ -172,6 +222,7 @@ impl Database {
                     created_at: row.get(17)?,
                     trashed_at: row.get(18)?,
                     title: row.get(19)?,
+                    negative_prompt: row.get(20)?,
                     tags: vec![],
                     references: vec![],
                 })
@@ -191,7 +242,7 @@ impl Database {
         let mut sql = String::from(
             "SELECT DISTINCT g.id, g.slug, g.prompt, g.model, g.provider, g.timestamp, g.date,
                     g.image_path, g.thumb_path, g.generation_time_seconds, g.cost_estimate_usd,
-                    g.seed, g.width, g.height, g.file_size, g.parent_id, g.starred, g.created_at, g.trashed_at, g.title
+                    g.seed, g.width, g.height, g.file_size, g.parent_id, g.starred, g.created_at, g.trashed_at, g.title, g.negative_prompt
              FROM generations g",
         );
 
@@ -301,17 +352,27 @@ impl Database {
                 created_at: row.get(17)?,
                 trashed_at: row.get(18)?,
                 title: row.get(19)?,
+                negative_prompt: row.get(20)?,
                 tags: vec![],
                 references: vec![],
             })
         })?;
 
-        let mut generations = vec![];
-        for row in rows {
-            let mut g = row?;
-            g.tags = self.get_tags_for_generation(g.id)?;
-            g.references = self.get_references_for_generation(g.id)?;
-            generations.push(g);
+        let mut generations: Vec<Generation> = rows.collect::<Result<_, _>>()?;
+
+        if !generations.is_empty() {
+            let ids: Vec<i64> = generations.iter().map(|g| g.id).collect();
+            let tags_map = self.get_tags_for_generations(&ids)?;
+            let refs_map = self.get_references_for_generations(&ids)?;
+
+            for g in &mut generations {
+                if let Some(tags) = tags_map.get(&g.id) {
+                    g.tags = tags.clone();
+                }
+                if let Some(refs) = refs_map.get(&g.id) {
+                    g.references = refs.clone();
+                }
+            }
         }
 
         Ok(generations)
@@ -460,6 +521,61 @@ impl Database {
             params![generation_id, tag],
         )?;
         Ok(())
+    }
+
+    fn get_tags_for_generations(&self, ids: &[i64]) -> Result<HashMap<i64, Vec<String>>> {
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT gt.generation_id, t.name FROM generation_tags gt
+             JOIN tags t ON gt.tag_id = t.id
+             WHERE gt.generation_id IN ({})",
+            placeholders
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let params: Vec<Box<dyn rusqlite::ToSql>> = ids.iter().map(|id| Box::new(*id) as Box<dyn rusqlite::ToSql>).collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+        let mut map: HashMap<i64, Vec<String>> = HashMap::new();
+        let rows = stmt.query_map(params_refs.as_slice(), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for row in rows {
+            let (gen_id, tag) = row?;
+            map.entry(gen_id).or_default().push(tag);
+        }
+        Ok(map)
+    }
+
+    fn get_references_for_generations(&self, ids: &[i64]) -> Result<HashMap<i64, Vec<Reference>>> {
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT gr.generation_id, r.id, r.hash, r.path, r.created_at
+             FROM refs r
+             JOIN generation_refs gr ON r.id = gr.ref_id
+             WHERE gr.generation_id IN ({})",
+            placeholders
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let params: Vec<Box<dyn rusqlite::ToSql>> = ids.iter().map(|id| Box::new(*id) as Box<dyn rusqlite::ToSql>).collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+        let mut map: HashMap<i64, Vec<Reference>> = HashMap::new();
+        let rows = stmt.query_map(params_refs.as_slice(), |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                Reference {
+                    id: row.get(1)?,
+                    hash: row.get(2)?,
+                    path: row.get(3)?,
+                    created_at: row.get(4)?,
+                },
+            ))
+        })?;
+        for row in rows {
+            let (gen_id, reference) = row?;
+            map.entry(gen_id).or_default().push(reference);
+        }
+        Ok(map)
     }
 
     pub fn get_tags_for_generation(&self, generation_id: i64) -> Result<Vec<String>> {
@@ -700,27 +816,7 @@ impl Database {
              ORDER BY created_at DESC",
         )?;
 
-        let rows = stmt.query_map([], |row| {
-            let status_str: String = row.get(1)?;
-            let source_str: String = row.get(5)?;
-            let tags_json: Option<String> = row.get(4)?;
-
-            Ok(Job {
-                id: row.get(0)?,
-                status: status_str.parse().unwrap_or(JobStatus::Pending),
-                model: row.get(2)?,
-                prompt: row.get(3)?,
-                tags: tags_json.and_then(|s| serde_json::from_str(&s).ok()),
-                source: source_str.parse().unwrap_or(JobSource::Cli),
-                ref_count: row.get(6)?,
-                created_at: row.get(7)?,
-                started_at: row.get(8)?,
-                completed_at: row.get(9)?,
-                generation_id: row.get(10)?,
-                error: row.get(11)?,
-            })
-        })?;
-
+        let rows = stmt.query_map([], parse_job_row)?;
         let mut jobs = vec![];
         for row in rows {
             jobs.push(row?);
@@ -728,9 +824,9 @@ impl Database {
         Ok(jobs)
     }
 
-    /// List recent failed jobs (last 24 hours)
+    /// List recent failed jobs (last 2 hours)
     pub fn list_recent_failed_jobs(&self, limit: i64) -> Result<Vec<Job>> {
-        let cutoff = chrono::Local::now() - chrono::Duration::hours(24);
+        let cutoff = chrono::Local::now() - chrono::Duration::hours(2);
         let cutoff_str = cutoff.format("%Y-%m-%dT%H:%M:%S").to_string();
 
         let mut stmt = self.conn.prepare(
@@ -741,27 +837,7 @@ impl Database {
              LIMIT ?2",
         )?;
 
-        let rows = stmt.query_map(params![cutoff_str, limit], |row| {
-            let status_str: String = row.get(1)?;
-            let source_str: String = row.get(5)?;
-            let tags_json: Option<String> = row.get(4)?;
-
-            Ok(Job {
-                id: row.get(0)?,
-                status: status_str.parse().unwrap_or(JobStatus::Pending),
-                model: row.get(2)?,
-                prompt: row.get(3)?,
-                tags: tags_json.and_then(|s| serde_json::from_str(&s).ok()),
-                source: source_str.parse().unwrap_or(JobSource::Cli),
-                ref_count: row.get(6)?,
-                created_at: row.get(7)?,
-                started_at: row.get(8)?,
-                completed_at: row.get(9)?,
-                generation_id: row.get(10)?,
-                error: row.get(11)?,
-            })
-        })?;
-
+        let rows = stmt.query_map(params![cutoff_str, limit], parse_job_row)?;
         let mut jobs = vec![];
         for row in rows {
             jobs.push(row?);
@@ -777,6 +853,92 @@ impl Database {
             "DELETE FROM generation_jobs WHERE status IN ('completed', 'failed') AND completed_at < ?1",
             params![cutoff_str],
         ).context("Failed to cleanup old jobs")?;
+
+        Ok(count)
+    }
+
+    // Collection operations
+
+    pub fn create_collection(&self, name: &str, description: Option<&str>) -> Result<i64> {
+        self.conn.execute(
+            "INSERT INTO collections (name, description) VALUES (?1, ?2)",
+            params![name, description],
+        ).context("Failed to create collection")?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn list_collections(&self) -> Result<Vec<Collection>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, description, created_at FROM collections ORDER BY name ASC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(Collection {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn add_to_collection(&self, generation_id: i64, collection_name: &str) -> Result<()> {
+        let collection_id: i64 = self.conn.query_row(
+            "SELECT id FROM collections WHERE name = ?1",
+            params![collection_name],
+            |row| row.get(0),
+        ).context("Collection not found")?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO generation_collections (generation_id, collection_id) VALUES (?1, ?2)",
+            params![generation_id, collection_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_from_collection(&self, generation_id: i64, collection_name: &str) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM generation_collections WHERE generation_id = ?1 AND collection_id = (SELECT id FROM collections WHERE name = ?2)",
+            params![generation_id, collection_name],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_collection(&self, name: &str) -> Result<bool> {
+        let rows = self.conn.execute(
+            "DELETE FROM collections WHERE name = ?1",
+            params![name],
+        )?;
+        Ok(rows > 0)
+    }
+
+    // Prompt history
+
+    pub fn prompt_history(&self, limit: i64) -> Result<Vec<(i64, String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, prompt, timestamp FROM generations
+             WHERE trashed_at IS NULL
+             ORDER BY timestamp DESC LIMIT ?1",
+        )?;
+        let rows = stmt.query_map(params![limit], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Mark stalled jobs (pending/running for > 30 minutes) as failed
+    pub fn cleanup_stalled_jobs(&self) -> Result<usize> {
+        let cutoff = chrono::Local::now() - chrono::Duration::minutes(30);
+        let cutoff_str = cutoff.format("%Y-%m-%dT%H:%M:%S").to_string();
+        let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+
+        let count = self.conn.execute(
+            "UPDATE generation_jobs
+             SET status = 'failed',
+                 error = 'Job timed out after 30 minutes',
+                 completed_at = ?1
+             WHERE status IN ('pending', 'running') AND created_at < ?2",
+            params![now, cutoff_str],
+        ).context("Failed to cleanup stalled jobs")?;
 
         Ok(count)
     }

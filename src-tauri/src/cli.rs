@@ -1,17 +1,27 @@
 use anyhow::{Context, Result};
-use chrono::{Duration, Local, NaiveDate};
+use chrono::Local;
 use clap::Subcommand;
 use std::path::{Path, PathBuf};
 
 use crate::archive;
 use crate::db::Database;
-use crate::models::{JobSource, ListFilter, ModelInfo, PromptingGuide};
-use crate::providers;
+use crate::models::{self, Generation, JobSource, ListFilter, ModelInfo, PromptingGuide};
+use crate::workflow;
 
 #[derive(Subcommand, Clone)]
 pub enum Commands {
     /// Generate an image
-    #[command(alias = "gen")]
+    #[command(alias = "gen", long_about = "Generate an image from a text prompt.\n\n\
+        Supports all providers (Gemini, fal.ai, OpenAI, self-hosted). Reference images \
+        enable image-to-image generation on supported models.\n\n\
+        Aspect ratios use SDXL-native resolutions (~1MP):\n  \
+        square (1024x1024), portrait/2:3 (832x1216), landscape/3:2 (1216x832),\n  \
+        wide/16:9 (1344x768), tall/9:16 (768x1344), 4:3 (1152x896), 3:4 (896x1152)\n\n\
+        Examples:\n  \
+        pixery generate -p \"a mountain lake at sunset\" -m gemini-flash\n  \
+        pixery gen -p \"anime girl\" -m animagine --negative \"lowres, bad anatomy\"\n  \
+        pixery gen -p \"portrait photo\" --ratio portrait -m gpt-image-1\n  \
+        pixery gen -f prompt.txt -m gemini-pro --ref reference.png -t character,fantasy")]
     Generate {
         /// Prompt text
         #[arg(short, long)]
@@ -36,6 +46,14 @@ pub enum Commands {
         /// Copy result to path
         #[arg(long)]
         copy_to: Option<PathBuf>,
+
+        /// Negative prompt
+        #[arg(long)]
+        negative: Option<String>,
+
+        /// Aspect ratio (e.g., square, portrait, 16:9, 2:3)
+        #[arg(long)]
+        ratio: Option<String>,
     },
 
     /// List recent generations
@@ -257,6 +275,144 @@ pub enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Generate multiple images from the same prompt
+    #[command(long_about = "Generate multiple images from the same prompt sequentially.\n\n\
+        Useful for exploring variations — same prompt/model produces different results each run. \
+        Reports per-image success/failure and a summary at the end.\n\n\
+        Examples:\n  \
+        pixery batch -p \"fantasy landscape\" -n 6\n  \
+        pixery batch -p \"character portrait\" -m animagine -n 4 --ratio portrait\n  \
+        pixery batch -p \"concept art\" -m gemini-pro --ref mood.png -t exploration")]
+    Batch {
+        /// Prompt text
+        #[arg(short, long)]
+        prompt: String,
+
+        /// Model to use
+        #[arg(short, long, default_value = "gemini-flash")]
+        model: String,
+
+        /// Number of images to generate
+        #[arg(short = 'n', long, default_value = "4")]
+        count: u32,
+
+        /// Tags (comma-separated)
+        #[arg(short, long)]
+        tags: Option<String>,
+
+        /// Reference image(s)
+        #[arg(short, long = "ref")]
+        reference: Vec<PathBuf>,
+
+        /// Negative prompt
+        #[arg(long)]
+        negative: Option<String>,
+
+        /// Aspect ratio (e.g., square, portrait, 16:9, 2:3)
+        #[arg(long)]
+        ratio: Option<String>,
+    },
+
+    /// Export generations to a directory
+    #[command(long_about = "Copy generation images to an output directory.\n\n\
+        Select generations by ID, by tag, or both. With --with-metadata, writes a \
+        JSON sidecar file alongside each image containing prompt, model, tags, cost, etc.\n\n\
+        Examples:\n  \
+        pixery export --ids 100 101 102 -o ./export/\n  \
+        pixery export --tag character -o ./characters/ --with-metadata\n  \
+        pixery export --ids 50 --tag landscape -o ./portfolio/")]
+    Export {
+        /// Generation IDs to export
+        #[arg(short, long)]
+        ids: Vec<i64>,
+
+        /// Export all generations with this tag
+        #[arg(short, long)]
+        tag: Option<String>,
+
+        /// Output directory
+        #[arg(short, long)]
+        output: PathBuf,
+
+        /// Write metadata.json sidecar files
+        #[arg(long)]
+        with_metadata: bool,
+    },
+
+    /// Manage collections (project folders)
+    #[command(long_about = "Manage collections — lightweight project folders for organizing generations.\n\n\
+        Collections group generations by project or theme, independent of tags. \
+        A generation can belong to multiple collections.\n\n\
+        Subcommands:\n  \
+        create  Create a new collection\n  \
+        list    List all collections\n  \
+        add     Add generation(s) to a collection\n  \
+        remove  Remove generation(s) from a collection\n  \
+        delete  Delete a collection (does not delete generations)\n\n\
+        Examples:\n  \
+        pixery collection create \"rpg-portraits\" -d \"Character art for the RPG project\"\n  \
+        pixery collection add 100 101 102 -c rpg-portraits\n  \
+        pixery collection list")]
+    Collection {
+        #[command(subcommand)]
+        action: CollectionAction,
+    },
+
+    /// Show recent prompt history
+    #[command(long_about = "Show recent prompts with generation IDs.\n\n\
+        Output columns: ID, DATE, PROMPT (truncated). Useful for re-using or iterating \
+        on previous prompts — copy the ID to 'pixery show' or 'pixery view' for details.\n\n\
+        Examples:\n  \
+        pixery history              # Last 20 prompts\n  \
+        pixery history -n 50        # Last 50 prompts")]
+    History {
+        /// Number of entries to show
+        #[arg(short = 'n', long, default_value = "20")]
+        limit: i64,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum CollectionAction {
+    /// Create a new collection
+    Create {
+        /// Collection name
+        name: String,
+
+        /// Description
+        #[arg(short, long)]
+        description: Option<String>,
+    },
+
+    /// List all collections
+    List,
+
+    /// Add generations to a collection
+    Add {
+        /// Generation IDs
+        ids: Vec<i64>,
+
+        /// Collection name
+        #[arg(short, long)]
+        collection: String,
+    },
+
+    /// Remove generations from a collection
+    Remove {
+        /// Generation IDs
+        ids: Vec<i64>,
+
+        /// Collection name
+        #[arg(short, long)]
+        collection: String,
+    },
+
+    /// Delete a collection
+    Delete {
+        /// Collection name
+        name: String,
+    },
 }
 
 pub fn run(cmd: Commands) -> Result<()> {
@@ -274,6 +430,8 @@ pub fn run(cmd: Commands) -> Result<()> {
             tags,
             reference,
             copy_to,
+            negative,
+            ratio,
         } => {
             let prompt_text = if let Some(p) = prompt {
                 p
@@ -292,10 +450,12 @@ pub fn run(cmd: Commands) -> Result<()> {
                 .map(|p| p.to_string_lossy().to_string())
                 .collect();
 
+            let (width, height) = resolve_ratio(ratio.as_deref())?;
+
             // Run async generation
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(async {
-                generate_image(&db, &prompt_text, &model, &tag_list, &ref_paths, copy_to.as_ref())
+                generate_image(&db, &prompt_text, &model, &tag_list, &ref_paths, copy_to.as_ref(), negative.as_deref(), width, height)
                     .await
             })?;
         }
@@ -549,7 +709,7 @@ pub fn run(cmd: Commands) -> Result<()> {
         }
 
         Commands::Cost { since } => {
-            let since_date = parse_since(&since)?;
+            let since_date = models::parse_since(&since).map_err(|e| anyhow::anyhow!(e))?;
             let summary = db.get_cost_summary(since_date.as_deref())?;
 
             println!("Cost Summary");
@@ -629,6 +789,127 @@ pub fn run(cmd: Commands) -> Result<()> {
         Commands::RegenThumbs { if_smaller, dry_run } => {
             regenerate_thumbnails(&db, if_smaller, dry_run)?;
         }
+
+        Commands::Batch {
+            prompt,
+            model,
+            count,
+            tags,
+            reference,
+            negative,
+            ratio,
+        } => {
+            let tag_list: Vec<String> = tags
+                .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_default();
+
+            let ref_paths: Vec<String> = reference
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
+
+            let (width, height) = resolve_ratio(ratio.as_deref())?;
+
+            println!("Generating {} images with {}...", count, model);
+
+            let rt = tokio::runtime::Runtime::new()?;
+            let mut successes = 0u32;
+            let mut failures = 0u32;
+
+            for i in 1..=count {
+                print!("[{}/{}] ", i, count);
+                match rt.block_on(async {
+                    workflow::perform_generation(
+                        &db,
+                        &prompt,
+                        &model,
+                        &tag_list,
+                        &ref_paths,
+                        JobSource::Cli,
+                        negative.as_deref(),
+                        width,
+                        height,
+                    )
+                    .await
+                }) {
+                    Ok((gen_id, generation)) => {
+                        println!("ID {} -> {}", gen_id, generation.image_path);
+                        successes += 1;
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        failures += 1;
+                    }
+                }
+            }
+
+            println!("\nBatch complete: {} succeeded, {} failed", successes, failures);
+        }
+
+        Commands::Export {
+            ids,
+            tag,
+            output,
+            with_metadata,
+        } => {
+            export_generations(&db, &ids, tag.as_deref(), &output, with_metadata)?;
+        }
+
+        Commands::Collection { action } => {
+            match action {
+                CollectionAction::Create { name, description } => {
+                    let id = db.create_collection(&name, description.as_deref())?;
+                    println!("Created collection '{}' (ID: {})", name, id);
+                }
+                CollectionAction::List => {
+                    let collections = db.list_collections()?;
+                    if collections.is_empty() {
+                        println!("No collections");
+                    } else {
+                        println!("{:<6} {:<20} {:<12} {}", "ID", "NAME", "CREATED", "DESCRIPTION");
+                        println!("{}", "-".repeat(60));
+                        for c in &collections {
+                            let desc = c.description.as_deref().unwrap_or("");
+                            println!("{:<6} {:<20} {:<12} {}", c.id, c.name, &c.created_at[..10], desc);
+                        }
+                    }
+                }
+                CollectionAction::Add { ids, collection } => {
+                    for id in &ids {
+                        db.add_to_collection(*id, &collection)?;
+                    }
+                    println!("Added {} generation(s) to '{}'", ids.len(), collection);
+                }
+                CollectionAction::Remove { ids, collection } => {
+                    for id in &ids {
+                        db.remove_from_collection(*id, &collection)?;
+                    }
+                    println!("Removed {} generation(s) from '{}'", ids.len(), collection);
+                }
+                CollectionAction::Delete { name } => {
+                    if db.delete_collection(&name)? {
+                        println!("Deleted collection '{}'", name);
+                    } else {
+                        println!("Collection '{}' not found", name);
+                    }
+                }
+            }
+        }
+
+        Commands::History { limit } => {
+            let entries = db.prompt_history(limit)?;
+            if entries.is_empty() {
+                println!("No prompt history");
+            } else {
+                println!("{:>5} {:<12} {}", "ID", "DATE", "PROMPT");
+                println!("{}", "-".repeat(70));
+                for (id, prompt, timestamp) in &entries {
+                    let date = &timestamp[..10];
+                    let prompt_display = truncate_string(prompt, 50);
+                    println!("{:>5} {:<12} {}", id, date, prompt_display);
+                }
+            }
+        }
     }
 
     Ok(())
@@ -641,91 +922,123 @@ async fn generate_image(
     tags: &[String],
     reference_paths: &[String],
     copy_to: Option<&PathBuf>,
+    negative_prompt: Option<&str>,
+    width: Option<i32>,
+    height: Option<i32>,
 ) -> Result<()> {
-    // Get model info
-    let model_info = ModelInfo::find(model);
-    let estimated_cost = model_info.as_ref().map(|m| m.cost_per_image);
-    let provider = model_info
-        .as_ref()
-        .map(|m| m.provider.to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-
-    // Create job to track this generation
-    let tags_opt = if tags.is_empty() { None } else { Some(tags) };
-    let job_id = db.create_job(model, prompt, tags_opt, JobSource::Cli, reference_paths.len() as i32)?;
-
-    // Mark job as running
-    db.update_job_started(job_id)?;
-
     println!("Generating with {}...", model);
 
-    // Generate image
-    let result = match providers::generate(model, prompt, reference_paths).await {
-        Ok(r) => r,
-        Err(e) => {
-            db.update_job_failed(job_id, &e.to_string())?;
-            return Err(e);
-        }
-    };
-
-    // Save to archive
-    let now = Local::now();
-    let date = now.format("%Y-%m-%d").to_string();
-    let timestamp = now.format("%Y-%m-%dT%H:%M:%S").to_string();
-    let slug = archive::slugify_prompt(prompt);
-
-    let (image_path, thumb_path, width, height, file_size) =
-        archive::save_image(&result.image_data, &date, &slug, &timestamp)?;
-
-    // Use actual cost from API response if available, otherwise use estimate
-    let cost = result.cost_usd.or(estimated_cost);
-
-    // Insert into database
-    let gen_id = db.insert_generation(
-        &slug,
-        prompt,
-        model,
-        &provider,
-        &timestamp,
-        &date,
-        image_path.to_str().unwrap(),
-        thumb_path.as_ref().and_then(|p| p.to_str()),
-        Some(result.generation_time_seconds),
-        cost,
-        result.seed.as_deref(),
-        Some(width),
-        Some(height),
-        Some(file_size),
-        None, // parent_id
-    )?;
-
-    // Add tags
-    if !tags.is_empty() {
-        db.add_tags(gen_id, tags)?;
-    }
-
-    // Store and link reference images
-    for ref_path in reference_paths {
-        let (hash, stored_path) = archive::store_reference(std::path::Path::new(ref_path))?;
-        let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap())?;
-        db.link_reference(gen_id, ref_id)?;
-    }
-
-    // Mark job as completed
-    db.update_job_completed(job_id, gen_id)?;
+    let (gen_id, generation) =
+        workflow::perform_generation(db, prompt, model, tags, reference_paths, JobSource::Cli, negative_prompt, width, height)
+            .await?;
 
     // Copy to destination if requested
     if let Some(dest) = copy_to {
-        archive::copy_to(&image_path, dest)?;
+        archive::copy_to(std::path::Path::new(&generation.image_path), dest)?;
         println!("Copied to: {}", dest.display());
     }
 
-    println!("Generated: {} (ID: {})", image_path.display(), gen_id);
-    if let Some(c) = cost {
-        let cost_type = if result.cost_usd.is_some() { "actual" } else { "estimated" };
-        println!("Cost: ${:.4} ({})", c, cost_type);
+    println!("Generated: {} (ID: {})", generation.image_path, gen_id);
+    if let Some(c) = generation.cost_estimate_usd {
+        println!("Cost: ${:.4}", c);
     }
 
+    Ok(())
+}
+
+/// Resolve --ratio flag to (width, height), or (None, None) if not specified.
+fn resolve_ratio(ratio: Option<&str>) -> Result<(Option<i32>, Option<i32>)> {
+    match ratio {
+        None => Ok((None, None)),
+        Some(r) => {
+            let (w, h) = models::resolve_aspect_ratio(r)
+                .ok_or_else(|| anyhow::anyhow!(
+                    "Invalid aspect ratio '{}'. Valid: square, portrait, landscape, wide, tall, 1:1, 2:3, 3:2, 4:3, 3:4, 16:9, 9:16",
+                    r
+                ))?;
+            Ok((Some(w), Some(h)))
+        }
+    }
+}
+
+fn export_generations(
+    db: &Database,
+    ids: &[i64],
+    tag: Option<&str>,
+    output: &Path,
+    with_metadata: bool,
+) -> Result<()> {
+    // Collect generations to export
+    let mut generations: Vec<Generation> = Vec::new();
+
+    for id in ids {
+        match db.get_generation(*id)? {
+            Some(g) => generations.push(g),
+            None => eprintln!("Generation {} not found, skipping", id),
+        }
+    }
+
+    if let Some(tag_filter) = tag {
+        let filter = ListFilter {
+            limit: None,
+            tags: Some(vec![tag_filter.to_string()]),
+            ..Default::default()
+        };
+        let tagged = db.list_generations(&filter)?;
+        for g in tagged {
+            if !generations.iter().any(|existing| existing.id == g.id) {
+                generations.push(g);
+            }
+        }
+    }
+
+    if generations.is_empty() {
+        println!("No generations to export");
+        return Ok(());
+    }
+
+    std::fs::create_dir_all(output).context("Failed to create output directory")?;
+
+    let mut exported = 0;
+    for gen in &generations {
+        let src = Path::new(&gen.image_path);
+        if !src.exists() {
+            eprintln!("Image file missing for ID {}, skipping", gen.id);
+            continue;
+        }
+
+        let filename = src
+            .file_name()
+            .ok_or_else(|| anyhow::anyhow!("Invalid image path for ID {}", gen.id))?;
+        let dest = output.join(filename);
+        std::fs::copy(src, &dest)
+            .with_context(|| format!("Failed to copy ID {} to {}", gen.id, dest.display()))?;
+
+        if with_metadata {
+            let meta_path = dest.with_extension("json");
+            let meta = serde_json::json!({
+                "id": gen.id,
+                "prompt": gen.prompt,
+                "model": gen.model,
+                "provider": gen.provider,
+                "date": gen.date,
+                "timestamp": gen.timestamp,
+                "cost_estimate_usd": gen.cost_estimate_usd,
+                "seed": gen.seed,
+                "width": gen.width,
+                "height": gen.height,
+                "tags": gen.tags,
+                "negative_prompt": gen.negative_prompt,
+                "starred": gen.starred,
+            });
+            std::fs::write(&meta_path, serde_json::to_string_pretty(&meta)?)
+                .with_context(|| format!("Failed to write metadata for ID {}", gen.id))?;
+        }
+
+        exported += 1;
+    }
+
+    println!("Exported {} image(s) to {}", exported, output.display());
     Ok(())
 }
 
@@ -762,13 +1075,16 @@ fn import_image(
         .or(extracted_time)
         .unwrap_or_else(|| now.format("%H%M%S").to_string());
 
+    // Pad to 6 chars to prevent slice panics on short input
+    let time_str = format!("{:0<6}", time_str);
+
     // Build full timestamp
     let timestamp = format!(
         "{}T{}:{}:{}",
         date,
-        &time_str[0..2.min(time_str.len())],
-        &time_str[2..4.min(time_str.len())],
-        &time_str[4..6.min(time_str.len())]
+        &time_str[0..2],
+        &time_str[2..4],
+        &time_str[4..6]
     );
 
     // Get model info for provider
@@ -800,6 +1116,7 @@ fn import_image(
         Some(height),
         Some(file_size),
         None, // parent_id
+        None, // negative_prompt
     )?;
 
     // Add tags
@@ -828,15 +1145,14 @@ fn import_image(
 /// - name-YYYYMMDD-HHMMSS.ext
 /// - name-v1-YYYYMMDD-HHMMSS.ext
 fn extract_datetime_from_filename(filename: &str) -> (Option<String>, Option<String>) {
-    // Look for 8-digit date pattern followed by 6-digit time
-    let re = regex::Regex::new(r"(\d{4})(\d{2})(\d{2})-(\d{6})").ok();
+    use std::sync::OnceLock;
+    static DATE_RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = DATE_RE.get_or_init(|| regex::Regex::new(r"(\d{4})(\d{2})(\d{2})-(\d{6})").unwrap());
 
-    if let Some(re) = re {
-        if let Some(caps) = re.captures(filename) {
-            let date = format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]);
-            let time = caps[4].to_string();
-            return (Some(date), Some(time));
-        }
+    if let Some(caps) = re.captures(filename) {
+        let date = format!("{}-{}-{}", &caps[1], &caps[2], &caps[3]);
+        let time = caps[4].to_string();
+        return (Some(date), Some(time));
     }
 
     (None, None)
@@ -879,32 +1195,6 @@ fn truncate_string(s: &str, max_len: usize) -> String {
     }
 }
 
-fn parse_since(since: &str) -> Result<Option<String>> {
-    if since == "all" {
-        return Ok(None);
-    }
-
-    let now = Local::now().date_naive();
-
-    if since.ends_with('d') {
-        let days: i64 = since[..since.len() - 1].parse().context("Invalid days format")?;
-        let date = now - Duration::days(days);
-        return Ok(Some(date.format("%Y-%m-%d").to_string()));
-    }
-
-    if since.ends_with('w') {
-        let weeks: i64 = since[..since.len() - 1].parse().context("Invalid weeks format")?;
-        let date = now - Duration::weeks(weeks);
-        return Ok(Some(date.format("%Y-%m-%d").to_string()));
-    }
-
-    // Try parsing as a date
-    if let Ok(date) = NaiveDate::parse_from_str(since, "%Y-%m-%d") {
-        return Ok(Some(date.format("%Y-%m-%d").to_string()));
-    }
-
-    anyhow::bail!("Invalid since format. Use '7d', '2w', or 'YYYY-MM-DD'");
-}
 
 fn regenerate_thumbnails(db: &Database, if_smaller: Option<u32>, dry_run: bool) -> Result<()> {
     use image::GenericImageView;

@@ -9,6 +9,7 @@ interface BatchActionBarProps {
   onTag: (tag: string) => void;
   onUseAsRefs: () => void;
   onRegen: () => void;
+  onCompare: () => void;
   onDelete: () => void;
   onClear: () => void;
 }
@@ -21,6 +22,7 @@ export function BatchActionBar({
   onTag,
   onUseAsRefs,
   onRegen,
+  onCompare,
   onDelete,
   onClear,
 }: BatchActionBarProps) {
@@ -122,6 +124,16 @@ export function BatchActionBar({
         >
           <kbd>g</kbd> Regen
         </button>
+
+        {count === 2 && (
+          <button
+            className="batch-btn"
+            onClick={onCompare}
+            title="Compare selected (c)"
+          >
+            <kbd>c</kbd> Compare
+          </button>
+        )}
 
         <div className="batch-action-wrapper">
           <button

@@ -72,10 +72,29 @@ fn get_api_key() -> Result<String> {
     std::env::var("FAL_KEY").context("FAL_KEY environment variable not set")
 }
 
+/// Map pixel dimensions to fal.ai image_size string names
+fn resolve_image_size(width: Option<i32>, height: Option<i32>) -> String {
+    match (width, height) {
+        (Some(w), Some(h)) => {
+            let ratio = w as f64 / h as f64;
+            if (ratio - 1.0).abs() < 0.1 { "square_hd".to_string() }
+            else if (ratio - 4.0/3.0).abs() < 0.1 { "landscape_4_3".to_string() }
+            else if (ratio - 3.0/4.0).abs() < 0.1 { "portrait_4_3".to_string() }
+            else if (ratio - 16.0/9.0).abs() < 0.1 { "landscape_16_9".to_string() }
+            else if (ratio - 9.0/16.0).abs() < 0.1 { "portrait_16_9".to_string() }
+            else { "square_hd".to_string() }
+        }
+        _ => "square_hd".to_string(),
+    }
+}
+
 pub async fn generate(
     model: &str,
     prompt: &str,
     reference_paths: &[String],
+    _negative_prompt: Option<&str>,
+    width: Option<i32>,
+    height: Option<i32>,
 ) -> Result<GenerationResult> {
     let api_key = get_api_key()?;
     let has_reference = !reference_paths.is_empty();
@@ -102,12 +121,12 @@ pub async fn generate(
     let request = FalRequest {
         prompt: prompt.to_string(),
         image_url,
-        image_size: Some("square_hd".to_string()),
+        image_size: Some(resolve_image_size(width, height)),
         strength,
     };
 
     let url = format!("{}/{}", API_BASE, model_id);
-    let client = reqwest::Client::new();
+    let client = super::client();
 
     let start = Instant::now();
     let response = client
