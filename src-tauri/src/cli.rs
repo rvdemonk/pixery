@@ -21,7 +21,8 @@ pub enum Commands {
         pixery generate -p \"a mountain lake at sunset\" -m gemini-flash\n  \
         pixery gen -p \"anime girl\" -m animagine --negative \"lowres, bad anatomy\"\n  \
         pixery gen -p \"portrait photo\" --ratio portrait -m gpt-image-1\n  \
-        pixery gen -f prompt.txt -m gemini-pro --ref reference.png -t character,fantasy")]
+        pixery gen -f prompt.txt -m gemini-pro --ref reference.png -t character,fantasy\n  \
+        pixery gen -p \"1girl, cafe\" -m animagine --ref char.png --ip-scale 0.4")]
     Generate {
         /// Prompt text
         #[arg(short, long)]
@@ -54,6 +55,10 @@ pub enum Commands {
         /// Aspect ratio (e.g., square, portrait, 16:9, 2:3)
         #[arg(long)]
         ratio: Option<String>,
+
+        /// IP-Adapter scale for self-hosted models (0.0-1.0, default 0.7)
+        #[arg(long)]
+        ip_scale: Option<f64>,
     },
 
     /// List recent generations
@@ -283,7 +288,8 @@ pub enum Commands {
         Examples:\n  \
         pixery batch -p \"fantasy landscape\" -n 6\n  \
         pixery batch -p \"character portrait\" -m animagine -n 4 --ratio portrait\n  \
-        pixery batch -p \"concept art\" -m gemini-pro --ref mood.png -t exploration")]
+        pixery batch -p \"concept art\" -m gemini-pro --ref mood.png -t exploration\n  \
+        pixery batch -p \"1girl, cafe\" -m animagine -n 4 --ref char.png --ip-scale 0.4")]
     Batch {
         /// Prompt text
         #[arg(short, long)]
@@ -312,6 +318,10 @@ pub enum Commands {
         /// Aspect ratio (e.g., square, portrait, 16:9, 2:3)
         #[arg(long)]
         ratio: Option<String>,
+
+        /// IP-Adapter scale for self-hosted models (0.0-1.0, default 0.7)
+        #[arg(long)]
+        ip_scale: Option<f64>,
     },
 
     /// Export generations to a directory
@@ -432,6 +442,7 @@ pub fn run(cmd: Commands) -> Result<()> {
             copy_to,
             negative,
             ratio,
+            ip_scale,
         } => {
             let prompt_text = if let Some(p) = prompt {
                 p
@@ -455,7 +466,7 @@ pub fn run(cmd: Commands) -> Result<()> {
             // Run async generation
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(async {
-                generate_image(&db, &prompt_text, &model, &tag_list, &ref_paths, copy_to.as_ref(), negative.as_deref(), width, height)
+                generate_image(&db, &prompt_text, &model, &tag_list, &ref_paths, copy_to.as_ref(), negative.as_deref(), width, height, ip_scale)
                     .await
             })?;
         }
@@ -798,6 +809,7 @@ pub fn run(cmd: Commands) -> Result<()> {
             reference,
             negative,
             ratio,
+            ip_scale,
         } => {
             let tag_list: Vec<String> = tags
                 .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
@@ -829,6 +841,7 @@ pub fn run(cmd: Commands) -> Result<()> {
                         negative.as_deref(),
                         width,
                         height,
+                        ip_scale,
                     )
                     .await
                 }) {
@@ -925,11 +938,12 @@ async fn generate_image(
     negative_prompt: Option<&str>,
     width: Option<i32>,
     height: Option<i32>,
+    ip_scale: Option<f64>,
 ) -> Result<()> {
     println!("Generating with {}...", model);
 
     let (gen_id, generation) =
-        workflow::perform_generation(db, prompt, model, tags, reference_paths, JobSource::Cli, negative_prompt, width, height)
+        workflow::perform_generation(db, prompt, model, tags, reference_paths, JobSource::Cli, negative_prompt, width, height, ip_scale)
             .await?;
 
     // Copy to destination if requested

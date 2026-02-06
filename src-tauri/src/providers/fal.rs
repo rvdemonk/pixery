@@ -26,6 +26,7 @@ fn resolve_model(model: &str, has_reference: bool) -> &str {
         "flux-pro" | "fal-ai/flux-pro/v1.1" => "fal-ai/flux-pro/v1.1",
         "flux-ultra" | "fal-ai/flux-pro/v1.1-ultra" => "fal-ai/flux-pro/v1.1-ultra",
         "recraft" | "fal-ai/recraft-v3" => "fal-ai/recraft-v3",
+        "imagen4" | "fal-ai/imagen4/preview" => "fal-ai/imagen4/preview",
         // Z-Image: route to image-to-image endpoint when reference provided
         "z-image" | "fal-ai/z-image/turbo" | "fal-ai/z-image/turbo/image-to-image" => {
             if has_reference {
@@ -45,6 +46,9 @@ struct FalRequest {
     image_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     image_size: Option<String>,
+    /// Aspect ratio for models that use ratio strings (e.g. Imagen 4: "1:1", "16:9")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aspect_ratio: Option<String>,
     /// Strength for image-to-image (0.0-1.0, default 0.6)
     /// Higher = more influence from prompt, lower = more from reference
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -88,6 +92,22 @@ fn resolve_image_size(width: Option<i32>, height: Option<i32>) -> String {
     }
 }
 
+/// Map pixel dimensions to aspect ratio strings (e.g. "1:1", "16:9") for Imagen 4
+fn resolve_aspect_ratio(width: Option<i32>, height: Option<i32>) -> String {
+    match (width, height) {
+        (Some(w), Some(h)) => {
+            let ratio = w as f64 / h as f64;
+            if (ratio - 1.0).abs() < 0.1 { "1:1".to_string() }
+            else if (ratio - 4.0/3.0).abs() < 0.1 { "4:3".to_string() }
+            else if (ratio - 3.0/4.0).abs() < 0.1 { "3:4".to_string() }
+            else if (ratio - 16.0/9.0).abs() < 0.1 { "16:9".to_string() }
+            else if (ratio - 9.0/16.0).abs() < 0.1 { "9:16".to_string() }
+            else { "1:1".to_string() }
+        }
+        _ => "1:1".to_string(),
+    }
+}
+
 pub async fn generate(
     model: &str,
     prompt: &str,
@@ -118,10 +138,12 @@ pub async fn generate(
         None
     };
 
+    let uses_aspect_ratio = model_id == "fal-ai/imagen4/preview";
     let request = FalRequest {
         prompt: prompt.to_string(),
         image_url,
-        image_size: Some(resolve_image_size(width, height)),
+        image_size: if uses_aspect_ratio { None } else { Some(resolve_image_size(width, height)) },
+        aspect_ratio: if uses_aspect_ratio { Some(resolve_aspect_ratio(width, height)) } else { None },
         strength,
     };
 

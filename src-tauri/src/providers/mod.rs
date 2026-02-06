@@ -24,6 +24,7 @@ pub async fn generate(
     negative_prompt: Option<&str>,
     width: Option<i32>,
     height: Option<i32>,
+    ip_scale: Option<f64>,
 ) -> Result<GenerationResult> {
     let provider = ModelInfo::provider_for_model(model)
         .or_else(|| {
@@ -40,7 +41,7 @@ pub async fn generate(
         Provider::Gemini => gemini::generate(model, prompt, reference_paths, negative_prompt, width, height).await,
         Provider::Fal => fal::generate(model, prompt, reference_paths, negative_prompt, width, height).await,
         Provider::OpenAI => openai::generate(model, prompt, reference_paths, negative_prompt, width, height).await,
-        Provider::SelfHosted => selfhosted::generate(model, prompt, reference_paths, negative_prompt, width, height).await,
+        Provider::SelfHosted => selfhosted::generate(model, prompt, reference_paths, negative_prompt, width, height, ip_scale).await,
     }
 }
 

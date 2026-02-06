@@ -62,8 +62,6 @@ High priority items to tackle next.
 
 Items to address when bandwidth allows.
 
-- [ ] `#feature` IP-Adapter for self-hosted Animagine - character consistency via reference images; weights downloaded, needs ~3.7GB CLIP image encoder + server.py integration
-
 - [ ] `#feature` Regenerate with parent_id - track lineage when regenerating (DB schema ready, not wired up)
 
 - [ ] `#feature` Notifications - alert when background generation completes (plugin configured, not implemented)
@@ -102,6 +100,7 @@ Items shipped, organized by version.
 - [x] Self-hosted server: FastAPI lifespan migration, auto-shutdown watchdog (60min idle), /switch-model pre-warming, LoRA support
 - [x] Collection-focused sidebar rework - smart filters (All/Starred/Trash/Uncategorized), clickable collections with counts, inline create, add-to-collection in details panel and batch action bar
 - [x] Shared reqwest client via OnceLock, parse_job_row extraction, batch tag/ref queries (N+1 fix), shared parse_since/mime_type/image_to_base64
+- [x] IP-Adapter for self-hosted models: CLIP ViT-H image encoder download, diffusers integration, `--ip-scale` CLI flag, attention slicing compatibility fix, Pony model filename fix
 - [x] CLI help improvements for Claude-as-user workflow - `pixery models MODEL --guide` outputs prompting guides (prose vs tags vs hybrid, required prefixes, negative templates, examples); main help shows workflow/iteration patterns; `view` recommends 600px width; `list` documents output columns; `show`/`view` descriptions clarified
 - [x] Server-side hidden tag filtering with infinite scroll - exclude_tags filter at DB level replaces client-side filtering; pagination (50/page) with IntersectionObserver auto-loads more on scroll
 - [x] Batch actions with multi-selection - Cmd/Ctrl+click toggles mark, Shift+click range selects; floating action bar for tag/delete/use-as-refs/regen; `m` key marks focused item; `u` clears selection; models auto-disabled when ref count exceeds max_refs

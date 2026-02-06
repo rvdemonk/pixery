@@ -112,6 +112,7 @@ pub async fn generate(
     negative_prompt: Option<&str>,
     width: Option<i32>,
     height: Option<i32>,
+    ip_scale: Option<f64>,
 ) -> Result<GenerationResult> {
     let base_url = get_server_url()
         .ok_or_else(|| anyhow::anyhow!("Self-hosted server URL not configured"))?;
@@ -127,7 +128,7 @@ pub async fn generate(
 
     // Set IP adapter scale only when reference is provided
     let ip_adapter_scale = if reference_image.is_some() {
-        Some(0.7)
+        Some(ip_scale.unwrap_or(0.7))
     } else {
         None
     };

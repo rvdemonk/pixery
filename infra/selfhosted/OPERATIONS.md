@@ -182,7 +182,7 @@ Server reads `models/*.toml` at startup, builds `AVAILABLE_MODELS` dict dynamica
 ## IP-Adapter & LoRA Support
 
 Current status:
-- **IP-Adapter:** Code exists in server.py but needs ~3.7GB image encoder. Works if disk space allows.
+- **IP-Adapter:** Fully wired. `setup-instance.sh` downloads weights + CLIP ViT-H image encoder (~5.2GB total). Loaded automatically at model load time if files present.
 - **LoRA:** Placeholder in server.py, not implemented.
 
 When implementing:

@@ -41,7 +41,7 @@ AVAILABLE_MODELS = {
         "default_negative": "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
     },
     "pony": {
-        "file": "ponyDiffusionV6XL.safetensors",
+        "file": "ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
         "default_cfg": 7.0,
         "default_steps": 25,
         "description": "Flexible, score-tag system, broader training",
@@ -172,9 +172,8 @@ def load_model(model_name: str) -> StableDiffusionXLPipeline:
     )
     pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
     pipe.to("cuda")
-    pipe.enable_attention_slicing()
 
-    # Load IP-Adapter if available
+    # Load IP-Adapter if available (must happen before enable_attention_slicing)
     if IP_ADAPTER_MODEL.exists():
         try:
             pipe.load_ip_adapter(
@@ -188,6 +187,10 @@ def load_model(model_name: str) -> StableDiffusionXLPipeline:
             ip_adapter_loaded = True
         except Exception as e:
             print(f"Warning: Could not load IP-Adapter: {e}")
+
+    # attention_slicing is incompatible with IP-Adapter attention processors
+    if not ip_adapter_loaded:
+        pipe.enable_attention_slicing()
 
     loaded_models[model_name] = pipe
     current_model = model_name
@@ -289,6 +292,11 @@ async def generate(request: GenerateRequest):
             ip_adapter_image = None
     elif request.reference_image and not ip_adapter_loaded:
         print("Warning: Reference image provided but IP-Adapter not loaded")
+
+    # When IP-Adapter is loaded but no reference provided, use a blank dummy at scale 0
+    if ip_adapter_loaded and ip_adapter_image is None:
+        pipe.set_ip_adapter_scale(0.0)
+        ip_adapter_image = Image.new("RGB", (224, 224), (0, 0, 0))
 
     # LoRA loading
     if request.lora_name:

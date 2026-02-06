@@ -37,6 +37,7 @@ pub async fn generate_image(
         params.negative_prompt.as_deref(),
         params.width,
         params.height,
+        None, // ip_scale: GUI doesn't expose this yet
     ).await {
         Ok(r) => r,
         Err(e) => {

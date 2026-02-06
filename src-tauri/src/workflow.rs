@@ -102,11 +102,12 @@ pub async fn perform_generation(
     negative_prompt: Option<&str>,
     width: Option<i32>,
     height: Option<i32>,
+    ip_scale: Option<f64>,
 ) -> Result<(i64, Generation)> {
     let (job_id, estimated_cost, provider) =
         prepare_generation(db, model, prompt, tags, source, reference_paths.len())?;
 
-    let result = match providers::generate(model, prompt, reference_paths, negative_prompt, width, height).await {
+    let result = match providers::generate(model, prompt, reference_paths, negative_prompt, width, height, ip_scale).await {
         Ok(r) => r,
         Err(e) => {
             db.update_job_failed(job_id, &e.to_string())?;

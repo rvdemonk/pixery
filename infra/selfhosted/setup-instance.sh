@@ -51,8 +51,8 @@ fi
 if [ "$MODELS_TO_DOWNLOAD" = "all" ] || [ "$MODELS_TO_DOWNLOAD" = "pony" ]; then
     echo ""
     echo "Downloading Pony Diffusion V6 XL (~6.5 GB)..."
-    if [ ! -f /workspace/models/ponyDiffusionV6XL.safetensors ]; then
-        hf_download "LyliaEngine/Pony_Diffusion_V6_XL" "ponyDiffusionV6XL.safetensors" "/workspace/models"
+    if [ ! -f /workspace/models/ponyDiffusionV6XL_v6StartWithThisOne.safetensors ]; then
+        hf_download "LyliaEngine/Pony_Diffusion_V6_XL" "ponyDiffusionV6XL_v6StartWithThisOne.safetensors" "/workspace/models"
     else
         echo "  Already exists, skipping"
     fi
@@ -69,13 +69,28 @@ if [ "$MODELS_TO_DOWNLOAD" = "noobai" ]; then
     echo ""
 fi
 
-# Download IP-Adapter
+# Download IP-Adapter weights + image encoder
 echo ""
-echo "Downloading IP-Adapter for SDXL (~1.5 GB)..."
-if [ ! -f /workspace/models/ip-adapter/ip-adapter-plus_sdxl_vit-h.safetensors ]; then
+echo "Downloading IP-Adapter Plus for SDXL..."
+
+echo "  Weights (~1.5 GB)..."
+if [ ! -f /workspace/models/ip-adapter/sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors ]; then
     hf_download "h94/IP-Adapter" "sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors" "/workspace/models/ip-adapter"
 else
-    echo "  Already exists, skipping"
+    echo "    Already exists, skipping"
+fi
+
+echo "  CLIP ViT-H image encoder (~2.5 GB)..."
+if [ ! -f /workspace/models/ip-adapter/sdxl_models/image_encoder/model.safetensors ]; then
+    # diffusers expects image_encoder under the subfolder: sdxl_models/image_encoder/
+    # Download from h94/IP-Adapter repo (models/image_encoder/) then move to correct location
+    hf_download "h94/IP-Adapter" "models/image_encoder/config.json" "/workspace/models/ip-adapter"
+    hf_download "h94/IP-Adapter" "models/image_encoder/model.safetensors" "/workspace/models/ip-adapter"
+    mkdir -p /workspace/models/ip-adapter/sdxl_models/image_encoder
+    mv /workspace/models/ip-adapter/models/image_encoder/* /workspace/models/ip-adapter/sdxl_models/image_encoder/
+    rm -rf /workspace/models/ip-adapter/models
+else
+    echo "    Already exists, skipping"
 fi
 
 echo ""

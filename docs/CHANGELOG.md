@@ -31,6 +31,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Version numbers 
 - Keyboard navigation (vim-style j/k, arrow keys)
 
 ### Added
+- IP-Adapter support for self-hosted SDXL models: character consistency via reference images with controllable influence
+- `--ip-scale` CLI flag for generate/batch: control IP-Adapter influence (0.0-1.0, default 0.7; 0.4 recommended for scene variety with face consistency)
+- Self-hosted setup downloads CLIP ViT-H image encoder alongside IP-Adapter weights automatically
 - CLI prompting guides: `pixery models MODEL --guide` outputs model-specific prompting instructions (style, required prefixes, structure, negative templates, examples)
 - CLI help improvements: main help shows workflow/iteration patterns, `view` recommends 600px width, `list` documents output columns, `show`/`view` descriptions clarified
 - Prompting guides available for: gemini (prose), animagine (booru tags), pony (score prefixes), noobai (hybrid)
@@ -48,6 +51,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Version numbers 
 - Gallery thumbnails now centered (was left-aligned with gap on right)
 
 ### Fixed
+- Self-hosted: `enable_attention_slicing()` incompatible with IP-Adapter attention processors — now skipped when IP-Adapter is loaded
+- Self-hosted: dummy zero-scale image passed when IP-Adapter loaded but no reference provided (diffusers requires `image_embeds` for every generation)
+- Self-hosted: Pony model filename updated to match current HuggingFace repo (`ponyDiffusionV6XL_v6StartWithThisOne.safetensors`)
+- Self-hosted: image encoder placed at `sdxl_models/image_encoder/` to match diffusers path resolution
 - Unified column headers across sidebar, gallery, and details panel (consistent 56px height)
 - Renamed leftover "imagen" branding to "pixery" in sidebar
 

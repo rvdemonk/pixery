@@ -291,6 +291,13 @@ impl ModelInfo {
                 cost_per_image: 0.04,
                 max_refs: 0,
             },
+            ModelInfo {
+                id: "imagen4".into(),
+                provider: Provider::Fal,
+                display_name: "Imagen 4 (Preview)".into(),
+                cost_per_image: 0.04,
+                max_refs: 0,
+            },
             // Z-Image Turbo: $0.005/MP. Routes to image-to-image endpoint when ref provided.
             // Max 1 reference image.
             ModelInfo {
