@@ -22,7 +22,7 @@ interface GenerateModalProps {
   models: ModelInfo[];
   initialState?: GenerateModalInitialState;
   onClose: () => void;
-  onGenerate: (prompt: string, model: string, tags: string[], referencePaths: string[], negativePrompt: string | null) => void;
+  onGenerate: (prompt: string, model: string, tags: string[], referencePaths: string[], negativePrompt: string | null, numRuns?: number) => void;
 }
 
 export function GenerateModal({
@@ -38,6 +38,7 @@ export function GenerateModal({
   const [selectedModel, setSelectedModel] = useState(initialState?.model || models[0]?.id || '');
   const [tagsInput, setTagsInput] = useState(initialState?.tags?.join(', ') || '');
   const [selectedRefs, setSelectedRefs] = useState<SelectedRef[]>(initialState?.references || []);
+  const [numRuns, setNumRuns] = useState(1);
 
   // Prompt autocomplete
   const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
@@ -188,7 +189,7 @@ export function GenerateModal({
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    onGenerate(prompt, selectedModel, tags, referencePaths, negativePrompt.trim() || null);
+    onGenerate(prompt, selectedModel, tags, referencePaths, negativePrompt.trim() || null, numRuns);
   };
 
   const lineageRefs = initialState?.lineage || [];
@@ -368,12 +369,35 @@ export function GenerateModal({
 
             {/* Generate button */}
             <div className="genmodal-actions">
+              <div className="genmodal-runs">
+                <label className="genmodal-runs-label">Runs</label>
+                <div className="genmodal-stepper">
+                  <button
+                    className="genmodal-stepper-btn"
+                    onClick={() => setNumRuns(Math.max(1, numRuns - 1))}
+                    disabled={numRuns <= 1}
+                  >
+                    −
+                  </button>
+                  <span className="genmodal-stepper-value">{numRuns}</span>
+                  <button
+                    className="genmodal-stepper-btn"
+                    onClick={() => setNumRuns(Math.min(20, numRuns + 1))}
+                    disabled={numRuns >= 20}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <span className="genmodal-cost">
+                ~${((models.find((m) => m.id === selectedModel)?.cost_per_image ?? 0) * numRuns).toFixed(3)}
+              </span>
               <button
                 className="btn btn-primary genmodal-generate"
                 onClick={handleGenerate}
                 disabled={!prompt.trim()}
               >
-                Generate
+                {numRuns > 1 ? `Generate ×${numRuns}` : 'Generate'}
               </button>
             </div>
           </div>
@@ -648,7 +672,74 @@ export function GenerateModal({
         .genmodal-actions {
           display: flex;
           justify-content: flex-end;
+          align-items: center;
+          gap: var(--spacing-md);
           padding-top: var(--spacing-sm);
+        }
+
+        .genmodal-runs {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-xs);
+        }
+
+        .genmodal-runs-label {
+          color: var(--text-muted);
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .genmodal-stepper {
+          display: flex;
+          align-items: center;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          overflow: hidden;
+        }
+
+        .genmodal-stepper-btn {
+          width: 36px;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-tertiary);
+          color: var(--text-primary);
+          border: none;
+          cursor: pointer;
+          font-size: 18px;
+          transition: background var(--transition-fast);
+        }
+
+        .genmodal-stepper-btn:hover:not(:disabled) {
+          background: var(--bg-hover);
+        }
+
+        .genmodal-stepper-btn:disabled {
+          color: var(--text-muted);
+          cursor: default;
+          opacity: 0.4;
+        }
+
+        .genmodal-stepper-value {
+          width: 36px;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-primary);
+          background: var(--bg-primary);
+          border-left: 1px solid var(--border);
+          border-right: 1px solid var(--border);
+        }
+
+        .genmodal-cost {
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+          font-size: 13px;
         }
 
         .genmodal-generate {

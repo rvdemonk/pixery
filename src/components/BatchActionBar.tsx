@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import type { TagCount } from '../lib/types';
+import type { TagCount, Collection } from '../lib/types';
 
 interface BatchActionBarProps {
   count: number;
   availableTags: TagCount[];
+  collections: Collection[];
   tagPopoverOpen: boolean;
   onTagPopoverOpenChange: (open: boolean) => void;
   onTag: (tag: string) => void;
+  onAddToCollection: (collectionName: string) => void;
   onUseAsRefs: () => void;
   onRegen: () => void;
   onCompare: () => void;
@@ -17,15 +19,18 @@ interface BatchActionBarProps {
 export function BatchActionBar({
   count,
   availableTags,
+  collections,
   tagPopoverOpen,
   onTagPopoverOpenChange,
   onTag,
+  onAddToCollection,
   onUseAsRefs,
   onRegen,
   onCompare,
   onDelete,
   onClear,
 }: BatchActionBarProps) {
+  const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const tagInputRef = useRef<HTMLInputElement>(null);
@@ -108,6 +113,38 @@ export function BatchActionBar({
             </div>
           )}
         </div>
+
+        {collections.length > 0 && (
+          <div className="batch-action-wrapper">
+            <button
+              className="batch-btn"
+              onClick={() => {
+                setCollectionPopoverOpen(!collectionPopoverOpen);
+                onTagPopoverOpenChange(false);
+              }}
+              title="Add to collection"
+            >
+              Collection
+            </button>
+            {collectionPopoverOpen && (
+              <div className="batch-popover collection-popover">
+                {collections.map((c) => (
+                  <button
+                    key={c.id}
+                    className="tag-suggestion"
+                    onClick={() => {
+                      onAddToCollection(c.name);
+                      setCollectionPopoverOpen(false);
+                    }}
+                  >
+                    {c.name}
+                    <span className="tag-count">({c.count})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <button
           className="batch-btn"

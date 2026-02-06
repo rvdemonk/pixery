@@ -427,6 +427,9 @@ pub struct ListFilter {
     pub starred_only: bool,
     pub search: Option<String>,
     pub since: Option<String>,
+    pub collection_id: Option<i64>,
+    pub show_trashed: bool,
+    pub uncategorized: bool,
 }
 
 /// Result of image generation from a provider
@@ -541,6 +544,7 @@ pub struct Collection {
     pub name: String,
     pub description: Option<String>,
     pub created_at: String,
+    pub count: i64,
 }
 
 /// Parse a "since" string (e.g., "7d", "30d", "today", "all") into a date string.

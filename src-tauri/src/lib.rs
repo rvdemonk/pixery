@@ -60,6 +60,8 @@ pub fn run() {
             commands::list_collections,
             commands::create_collection,
             commands::add_to_collection,
+            commands::remove_from_collection,
+            commands::delete_collection,
             commands::prompt_history,
             commands::get_selfhosted_url,
             commands::set_selfhosted_url,

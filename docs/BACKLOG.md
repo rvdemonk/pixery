@@ -37,7 +37,11 @@ High priority items to tackle next.
 
 - [ ] `#ux` Prompt autocomplete improvements - show generation title alongside prompt for recognition (prompts are often too long); respect hidden tags (never suggest prompts from generations tagged with actively-hidden tags)
 
-- [ ] `#ux` Collection creation in GUI - add "+" button in sidebar collections section to create new collections; also add "Add to collection" in details panel and batch action bar
+- [ ] `#ux` Context menu: remove from collection - when right-clicking an image while viewing a collection, show "Remove from collection" option
+
+- [ ] `#ux` Hidden collections in settings - add ability to hide collections from sidebar (similar to hidden tags)
+
+- [ ] `#feature` Safe mode toggle - single toggle in settings that hides all registered sensitive collections and tags at once; quick way to make the gallery presentable
 
 - [ ] `#ux` Details close button - make X button larger, follow best practices for dismiss targets
 
@@ -96,6 +100,7 @@ Items shipped, organized by version.
 - [x] `pixery history` - show recent prompts with generation IDs
 - [x] Prompt autocomplete in GenerateModal - fetches recent prompts, substring match dropdown
 - [x] Self-hosted server: FastAPI lifespan migration, auto-shutdown watchdog (60min idle), /switch-model pre-warming, LoRA support
+- [x] Collection-focused sidebar rework - smart filters (All/Starred/Trash/Uncategorized), clickable collections with counts, inline create, add-to-collection in details panel and batch action bar
 - [x] Shared reqwest client via OnceLock, parse_job_row extraction, batch tag/ref queries (N+1 fix), shared parse_since/mime_type/image_to_base64
 - [x] CLI help improvements for Claude-as-user workflow - `pixery models MODEL --guide` outputs prompting guides (prose vs tags vs hybrid, required prefixes, negative templates, examples); main help shows workflow/iteration patterns; `view` recommends 600px width; `list` documents output columns; `show`/`view` descriptions clarified
 - [x] Server-side hidden tag filtering with infinite scroll - exclude_tags filter at DB level replaces client-side filtering; pagination (50/page) with IntersectionObserver auto-loads more on scroll

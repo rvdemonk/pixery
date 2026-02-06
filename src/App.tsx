@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import type { Generation, ModelInfo, ListFilter, SelfHostedStatus } from './lib/types';
+import type { Generation, ModelInfo, ListFilter, SelfHostedStatus, Collection, TodayCost } from './lib/types';
 import * as api from './lib/api';
 import { useGenerations } from './hooks/useGenerations';
 import { useTags } from './hooks/useTags';
@@ -34,6 +34,12 @@ export default function App() {
   const [filterModel, setFilterModel] = useState<string | null>(null);
   const [starredOnly, setStarredOnly] = useState(false);
 
+  // Sidebar navigation state
+  const [activeCollection, setActiveCollection] = useState<number | null>(null);
+  const [showTrashed, setShowTrashed] = useState(false);
+  const [showUncategorized, setShowUncategorized] = useState(false);
+  const [collections, setCollections] = useState<Collection[]>([]);
+
   // Selection state
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [markedIds, setMarkedIds] = useState<Set<number>>(new Set());
@@ -64,6 +70,9 @@ export default function App() {
   const [cloudModels, setCloudModels] = useState<ModelInfo[]>([]);
   const [selfHostedStatus, setSelfHostedStatus] = useState<SelfHostedStatus | null>(null);
 
+  // Today's cost
+  const [todayCost, setTodayCost] = useState<TodayCost>({ total: 0, byModel: [] });
+
   // Combined model list: self-hosted first (if connected), then cloud
   const models = useMemo(() => {
     const result: ModelInfo[] = [];
@@ -90,7 +99,7 @@ export default function App() {
   // Hooks
   const { hiddenTags, toggleHiddenTag, thumbnailSize, setThumbnailSize } = useSettings();
   const { tags: allTags, addTags, removeTag, refresh: refreshTags } = useTags();
-  const { generating, error: generateError, generate } = useGenerate();
+  const { generating, progress: generateProgress, error: generateError, generate } = useGenerate();
   const { jobs, activeCount, failedJobs, failedCount, dismissFailedJob } = useJobs();
 
   // Build filter with exclude_tags for server-side hidden tag filtering
@@ -107,11 +116,22 @@ export default function App() {
     [allTags, hiddenTags]
   );
 
-  // Load models on mount
+  const refreshTodayCost = useCallback(() => {
+    api.getCostSummary('today').then((s) => {
+      setTodayCost({ total: s.total_usd, byModel: s.by_model });
+    }).catch(() => {});
+  }, []);
+
+  // Load models, collections, and today's cost on mount
   useEffect(() => {
     api.listModels().then(setCloudModels);
-    // Check self-hosted server status (non-blocking)
     api.checkSelfhostedHealth().then(setSelfHostedStatus);
+    api.listCollections().then(setCollections).catch(() => {});
+    refreshTodayCost();
+  }, [refreshTodayCost]);
+
+  const refreshCollections = useCallback(() => {
+    api.listCollections().then(setCollections).catch(() => {});
   }, []);
 
   // Refresh self-hosted status (called when settings change)
@@ -124,21 +144,68 @@ export default function App() {
     const unlisten = listen('generation-added', () => {
       refresh();
       refreshTags();
+      refreshCollections();
+      refreshTodayCost();
     });
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [refresh, refreshTags]);
+  }, [refresh, refreshTags, refreshCollections, refreshTodayCost]);
 
-  // Update filter when tags/model/starred changes
+  // Update filter when tags/model/starred/collection/trash/uncategorized changes
   useEffect(() => {
     setFilter((prev) => ({
       ...prev,
       tags: filterTags.length > 0 ? filterTags : undefined,
       model: filterModel || undefined,
       starred_only: starredOnly,
+      collection_id: activeCollection || undefined,
+      show_trashed: showTrashed,
+      uncategorized: showUncategorized,
     }));
-  }, [filterTags, filterModel, starredOnly]);
+  }, [filterTags, filterModel, starredOnly, activeCollection, showTrashed, showUncategorized]);
+
+  // Sidebar navigation handlers (mutually exclusive)
+  const handleShowAll = useCallback(() => {
+    setStarredOnly(false);
+    setShowTrashed(false);
+    setShowUncategorized(false);
+    setActiveCollection(null);
+    setFilterTags([]);
+  }, []);
+
+  const handleShowStarred = useCallback(() => {
+    setStarredOnly(true);
+    setShowTrashed(false);
+    setShowUncategorized(false);
+    setActiveCollection(null);
+  }, []);
+
+  const handleShowTrashed = useCallback(() => {
+    setShowTrashed(true);
+    setStarredOnly(false);
+    setShowUncategorized(false);
+    setActiveCollection(null);
+  }, []);
+
+  const handleShowUncategorized = useCallback(() => {
+    setShowUncategorized(true);
+    setStarredOnly(false);
+    setShowTrashed(false);
+    setActiveCollection(null);
+  }, []);
+
+  const handleSelectCollection = useCallback((id: number) => {
+    setActiveCollection(id);
+    setStarredOnly(false);
+    setShowTrashed(false);
+    setShowUncategorized(false);
+  }, []);
+
+  const handleCreateCollection = useCallback(async (name: string) => {
+    await api.createCollection(name);
+    refreshCollections();
+  }, [refreshCollections]);
 
   // Tag filter handlers
   const addFilterTag = useCallback((tag: string) => {
@@ -247,13 +314,13 @@ export default function App() {
   }, [selectedGeneration]);
 
   // Generate from remix modal
-  const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[], tags: string[]) => {
+  const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[], tags: string[], numRuns: number = 1) => {
     if (!selectedGeneration) return;
     // Close modals immediately
     setRemixOpen(false);
     setPickerOpen(false);
     // Generate in background
-    const result = await generate({
+    const results = await generate({
       prompt,
       model,
       tags,
@@ -262,13 +329,14 @@ export default function App() {
       negative_prompt: null,
       width: null,
       height: null,
-    });
-    if (result) {
+    }, numRuns);
+    if (results.length > 0) {
       refresh();
       refreshTags();
-      setSelectedId(result.id);
+      refreshTodayCost();
+      setSelectedId(results[results.length - 1].id);
     }
-  }, [selectedGeneration, generate, refresh, refreshTags]);
+  }, [selectedGeneration, generate, refresh, refreshTags, refreshTodayCost]);
 
   // Add reference from gallery picker
   const handleAddReferenceFromPicker = useCallback((generation: Generation) => {
@@ -316,9 +384,9 @@ export default function App() {
     refresh();
   }, [selectedId, refresh]);
 
-  const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[], referencePaths: string[], negativePrompt: string | null = null) => {
+  const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[], referencePaths: string[], negativePrompt: string | null = null, numRuns: number = 1) => {
     setGenerateOpen(false);
-    const result = await generate({
+    const results = await generate({
       prompt,
       model,
       tags: genTags,
@@ -327,13 +395,14 @@ export default function App() {
       negative_prompt: negativePrompt,
       width: null,
       height: null,
-    });
-    if (result) {
+    }, numRuns);
+    if (results.length > 0) {
       refresh();
       refreshTags();
-      setSelectedId(result.id);
+      refreshTodayCost();
+      setSelectedId(results[results.length - 1].id);
     }
-  }, [generate, refresh, refreshTags]);
+  }, [generate, refresh, refreshTags, refreshTodayCost]);
 
   // Multi-selection handlers
   const handleSelect = useCallback((id: number, event: React.MouseEvent) => {
@@ -514,21 +583,22 @@ export default function App() {
   return (
     <div className="app-layout">
       <Sidebar
-        tags={tags}
-        filterTags={filterTags}
-        onToggleTag={(tag) => {
-          if (filterTags.includes(tag)) {
-            removeFilterTag(tag);
-          } else {
-            addFilterTag(tag);
-          }
-        }}
+        collections={collections}
+        activeCollection={activeCollection}
         starredOnly={starredOnly}
-        onToggleStarred={() => setStarredOnly(!starredOnly)}
+        showTrashed={showTrashed}
+        showUncategorized={showUncategorized}
+        onShowAll={handleShowAll}
+        onShowStarred={handleShowStarred}
+        onShowTrashed={handleShowTrashed}
+        onShowUncategorized={handleShowUncategorized}
+        onSelectCollection={handleSelectCollection}
+        onCreateCollection={handleCreateCollection}
         onOpenDashboard={() => setView('dashboard')}
         onOpenSettings={() => setSettingsOpen(true)}
         pinned={sidebarPinned}
         onTogglePin={() => setSidebarPinned(!sidebarPinned)}
+        todayCost={todayCost}
       />
 
       <main className="main-content">
@@ -555,6 +625,11 @@ export default function App() {
             <option value="xl">XL</option>
             <option value="xxl">XXL</option>
           </select>
+          {generating && generateProgress && (
+            <span className="batch-progress">
+              {generateProgress.current}/{generateProgress.total}
+            </span>
+          )}
           <JobsIndicator
             jobs={jobs}
             activeCount={activeCount}
@@ -597,11 +672,17 @@ export default function App() {
         <Details
           generation={selectedGeneration}
           models={models}
+          collections={collections}
           onClose={() => setDetailsOpen(false)}
           onToggleStar={handleToggleStar}
           onUpdateTitle={handleUpdateTitle}
           onAddTag={handleAddTag}
           onRemoveTag={handleRemoveTag}
+          onAddToCollection={async (collectionName) => {
+            if (!selectedId) return;
+            await api.addToCollection(selectedId, collectionName);
+            refreshCollections();
+          }}
           onRemix={handleOpenRemix}
           onReference={handleOpenReference}
           onTrash={handleTrash}
@@ -695,9 +776,16 @@ export default function App() {
         <BatchActionBar
           count={markedIds.size}
           availableTags={tags}
+          collections={collections}
           tagPopoverOpen={batchTagOpen}
           onTagPopoverOpenChange={setBatchTagOpen}
           onTag={handleBatchTag}
+          onAddToCollection={async (collectionName) => {
+            for (const id of markedIds) {
+              await api.addToCollection(id, collectionName);
+            }
+            refreshCollections();
+          }}
           onUseAsRefs={handleUseAsRefs}
           onRegen={handleBatchRegen}
           onCompare={handleCompare}
@@ -709,6 +797,12 @@ export default function App() {
       <style>{`
         .main-header {
           gap: var(--spacing-md);
+        }
+        .batch-progress {
+          color: var(--accent);
+          font-family: var(--font-mono);
+          font-size: 13px;
+          font-weight: 600;
         }
         .size-select {
           height: 36px;

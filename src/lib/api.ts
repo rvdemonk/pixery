@@ -119,10 +119,18 @@ export async function listCollections(): Promise<Collection[]> {
   return invoke('list_collections');
 }
 
-export async function createCollection(name: string, description?: string): Promise<Collection> {
+export async function createCollection(name: string, description?: string): Promise<number> {
   return invoke('create_collection', { name, description });
 }
 
 export async function addToCollection(generationId: number, collectionName: string): Promise<void> {
   return invoke('add_to_collection', { generationId, collectionName });
+}
+
+export async function removeFromCollection(generationId: number, collectionName: string): Promise<void> {
+  return invoke('remove_from_collection', { generationId, collectionName });
+}
+
+export async function deleteCollection(name: string): Promise<boolean> {
+  return invoke('delete_collection', { name });
 }

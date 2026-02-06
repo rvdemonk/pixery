@@ -866,11 +866,11 @@ pub fn run(cmd: Commands) -> Result<()> {
                     if collections.is_empty() {
                         println!("No collections");
                     } else {
-                        println!("{:<6} {:<20} {:<12} {}", "ID", "NAME", "CREATED", "DESCRIPTION");
-                        println!("{}", "-".repeat(60));
+                        println!("{:<6} {:<20} {:>5} {:<12} {}", "ID", "NAME", "COUNT", "CREATED", "DESCRIPTION");
+                        println!("{}", "-".repeat(70));
                         for c in &collections {
                             let desc = c.description.as_deref().unwrap_or("");
-                            println!("{:<6} {:<20} {:<12} {}", c.id, c.name, &c.created_at[..10], desc);
+                            println!("{:<6} {:<20} {:>5} {:<12} {}", c.id, c.name, c.count, &c.created_at[..10], desc);
                         }
                     }
                 }

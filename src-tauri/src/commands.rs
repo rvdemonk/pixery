@@ -236,6 +236,25 @@ pub fn add_to_collection(
 }
 
 #[tauri::command]
+pub fn remove_from_collection(
+    state: State<'_, AppState>,
+    generation_id: i64,
+    collection_name: String,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.remove_from_collection(generation_id, &collection_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_collection(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<bool, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.delete_collection(&name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn prompt_history(
     state: State<'_, AppState>,
     limit: i64,

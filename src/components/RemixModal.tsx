@@ -7,7 +7,7 @@ interface RemixModalProps {
   models: ModelInfo[];
   references: Reference[];
   onClose: () => void;
-  onGenerate: (prompt: string, model: string, referencePaths: string[], tags: string[]) => void;
+  onGenerate: (prompt: string, model: string, referencePaths: string[], tags: string[], numRuns?: number) => void;
   onAddReference: () => void;
   onRemoveReference: (refId: number) => void;
 }
@@ -24,6 +24,7 @@ export function RemixModal({
   const [prompt, setPrompt] = useState(generation.prompt);
   const [selectedModel, setSelectedModel] = useState(generation.model);
   const [tagsInput, setTagsInput] = useState(generation.tags.join(', '));
+  const [numRuns, setNumRuns] = useState(1);
 
   // Reset local state when generation changes
   useEffect(() => {
@@ -38,7 +39,7 @@ export function RemixModal({
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    onGenerate(prompt, selectedModel, referencePaths, tags);
+    onGenerate(prompt, selectedModel, referencePaths, tags, numRuns);
   };
 
   return (
@@ -131,12 +132,35 @@ export function RemixModal({
 
             {/* Generate button */}
             <div className="remix-actions">
+              <div className="remix-runs">
+                <label className="remix-runs-label">Runs</label>
+                <div className="remix-stepper">
+                  <button
+                    className="remix-stepper-btn"
+                    onClick={() => setNumRuns(Math.max(1, numRuns - 1))}
+                    disabled={numRuns <= 1}
+                  >
+                    −
+                  </button>
+                  <span className="remix-stepper-value">{numRuns}</span>
+                  <button
+                    className="remix-stepper-btn"
+                    onClick={() => setNumRuns(Math.min(20, numRuns + 1))}
+                    disabled={numRuns >= 20}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <span className="remix-cost">
+                ~${((models.find((m) => m.id === selectedModel)?.cost_per_image ?? 0) * numRuns).toFixed(3)}
+              </span>
               <button
                 className="btn btn-primary remix-generate"
                 onClick={handleGenerate}
                 disabled={!prompt.trim()}
               >
-                Generate
+                {numRuns > 1 ? `Generate ×${numRuns}` : 'Generate'}
               </button>
             </div>
           </div>
@@ -354,7 +378,74 @@ export function RemixModal({
         .remix-actions {
           display: flex;
           justify-content: flex-end;
+          align-items: center;
+          gap: var(--spacing-md);
           padding-top: var(--spacing-md);
+        }
+
+        .remix-runs {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-xs);
+        }
+
+        .remix-runs-label {
+          color: var(--text-muted);
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .remix-stepper {
+          display: flex;
+          align-items: center;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          overflow: hidden;
+        }
+
+        .remix-stepper-btn {
+          width: 36px;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-tertiary);
+          color: var(--text-primary);
+          border: none;
+          cursor: pointer;
+          font-size: 18px;
+          transition: background var(--transition-fast);
+        }
+
+        .remix-stepper-btn:hover:not(:disabled) {
+          background: var(--bg-hover);
+        }
+
+        .remix-stepper-btn:disabled {
+          color: var(--text-muted);
+          cursor: default;
+          opacity: 0.4;
+        }
+
+        .remix-stepper-value {
+          width: 36px;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-primary);
+          background: var(--bg-primary);
+          border-left: 1px solid var(--border);
+          border-right: 1px solid var(--border);
+        }
+
+        .remix-cost {
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+          font-size: 13px;
         }
 
         .remix-generate {

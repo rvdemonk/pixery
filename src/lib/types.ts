@@ -40,6 +40,7 @@ export interface Collection {
   name: string;
   description: string | null;
   created_at: string;
+  count: number;
 }
 
 export interface ListFilter {
@@ -51,6 +52,9 @@ export interface ListFilter {
   starred_only?: boolean;
   search?: string;
   since?: string;
+  collection_id?: number;
+  show_trashed?: boolean;
+  uncategorized?: boolean;
 }
 
 export interface TagCount {
@@ -80,6 +84,11 @@ export interface CostSummary {
   by_model: [string, number][];
   by_day: [string, number][];
   count: number;
+}
+
+export interface TodayCost {
+  total: number;
+  byModel: [string, number][];
 }
 
 export interface Reference {

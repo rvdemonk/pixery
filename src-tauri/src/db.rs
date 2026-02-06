@@ -249,8 +249,23 @@ impl Database {
         let mut conditions = vec![];
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = vec![];
 
-        // Exclude trashed items by default
-        conditions.push("g.trashed_at IS NULL".to_string());
+        // Trashed filter: show trashed OR exclude trashed (default)
+        if filter.show_trashed {
+            conditions.push("g.trashed_at IS NOT NULL".to_string());
+        } else {
+            conditions.push("g.trashed_at IS NULL".to_string());
+        }
+
+        // Collection filter
+        if let Some(collection_id) = filter.collection_id {
+            conditions.push("g.id IN (SELECT generation_id FROM generation_collections WHERE collection_id = ?)".to_string());
+            params_vec.push(Box::new(collection_id));
+        }
+
+        // Uncategorized: not in any collection
+        if filter.uncategorized {
+            conditions.push("g.id NOT IN (SELECT generation_id FROM generation_collections)".to_string());
+        }
 
         // Multi-tag filter with AND logic: images must have ALL specified tags
         if let Some(ref tags) = filter.tags {
@@ -869,7 +884,13 @@ impl Database {
 
     pub fn list_collections(&self) -> Result<Vec<Collection>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, description, created_at FROM collections ORDER BY name ASC",
+            "SELECT c.id, c.name, c.description, c.created_at,
+                    COUNT(gc.generation_id) as count
+             FROM collections c
+             LEFT JOIN generation_collections gc ON c.id = gc.collection_id
+             LEFT JOIN generations g ON gc.generation_id = g.id AND g.trashed_at IS NULL
+             GROUP BY c.id
+             ORDER BY c.name ASC",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok(Collection {
@@ -877,6 +898,7 @@ impl Database {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 created_at: row.get(3)?,
+                count: row.get(4)?,
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)

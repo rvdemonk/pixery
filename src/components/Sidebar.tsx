@@ -1,35 +1,56 @@
-import { useState, useEffect } from 'react';
-import type { TagCount, Collection } from '../lib/types';
-import { listCollections } from '../lib/api';
+import { useState } from 'react';
+import type { Collection, TodayCost } from '../lib/types';
 
 interface SidebarProps {
-  tags: TagCount[];
-  filterTags: string[];
-  onToggleTag: (tag: string) => void;
+  collections: Collection[];
+  activeCollection: number | null;
   starredOnly: boolean;
-  onToggleStarred: () => void;
+  showTrashed: boolean;
+  showUncategorized: boolean;
+  onShowAll: () => void;
+  onShowStarred: () => void;
+  onShowTrashed: () => void;
+  onShowUncategorized: () => void;
+  onSelectCollection: (id: number) => void;
+  onCreateCollection: (name: string) => void;
   onOpenDashboard: () => void;
   onOpenSettings: () => void;
   pinned: boolean;
   onTogglePin: () => void;
+  todayCost: TodayCost;
 }
 
 export function Sidebar({
-  tags,
-  filterTags,
-  onToggleTag,
+  collections,
+  activeCollection,
   starredOnly,
-  onToggleStarred,
+  showTrashed,
+  showUncategorized,
+  onShowAll,
+  onShowStarred,
+  onShowTrashed,
+  onShowUncategorized,
+  onSelectCollection,
+  onCreateCollection,
   onOpenDashboard,
   onOpenSettings,
   pinned,
   onTogglePin,
+  todayCost,
 }: SidebarProps) {
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
 
-  useEffect(() => {
-    listCollections().then(setCollections).catch(() => {});
-  }, []);
+  const isAllActive = !starredOnly && !showTrashed && !showUncategorized && activeCollection === null;
+
+  const handleCreateSubmit = () => {
+    const trimmed = newName.trim();
+    if (trimmed) {
+      onCreateCollection(trimmed);
+    }
+    setNewName('');
+    setCreating(false);
+  };
 
   return (
     <aside className={`sidebar ${pinned ? 'sidebar-pinned' : ''}`}>
@@ -47,54 +68,90 @@ export function Sidebar({
 
         <div className="sidebar-section">
           <button
-            className={`sidebar-item ${filterTags.length === 0 && !starredOnly ? 'sidebar-item-active' : ''}`}
-            onClick={() => {
-              // Clear all filter tags when clicking "All"
-              filterTags.forEach((tag) => onToggleTag(tag));
-              if (starredOnly) onToggleStarred();
-            }}
+            className={`sidebar-item ${isAllActive ? 'sidebar-item-active' : ''}`}
+            onClick={onShowAll}
           >
             <span>All</span>
           </button>
           <button
             className={`sidebar-item ${starredOnly ? 'sidebar-item-active' : ''}`}
-            onClick={onToggleStarred}
+            onClick={onShowStarred}
           >
-            <span>★ Starred</span>
+            <span>Starred</span>
+          </button>
+          <button
+            className={`sidebar-item ${showTrashed ? 'sidebar-item-active' : ''}`}
+            onClick={onShowTrashed}
+          >
+            <span>Trash</span>
+          </button>
+          <button
+            className={`sidebar-item ${showUncategorized ? 'sidebar-item-active' : ''}`}
+            onClick={onShowUncategorized}
+          >
+            <span>Uncategorized</span>
           </button>
         </div>
 
-        {collections.length > 0 && (
-          <div className="sidebar-section">
-            <h3 className="sidebar-section-title">Collections</h3>
-            <div className="sidebar-collections">
-              {collections.map((col) => (
-                <div key={col.id} className="sidebar-item sidebar-collection">
-                  <span className="truncate">{col.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="sidebar-section">
-          <h3 className="sidebar-section-title">Tags</h3>
-          <div className="sidebar-tags">
-            {tags.map((tag) => (
+          <div className="sidebar-section-header">
+            <h3 className="sidebar-section-title">Collections</h3>
+            <button
+              className="sidebar-add-btn"
+              onClick={() => setCreating(!creating)}
+              title="Create collection"
+            >
+              +
+            </button>
+          </div>
+          {creating && (
+            <div className="sidebar-create-input">
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateSubmit();
+                  if (e.key === 'Escape') { setCreating(false); setNewName(''); }
+                }}
+                placeholder="Collection name..."
+                autoFocus
+                onBlur={handleCreateSubmit}
+              />
+            </div>
+          )}
+          <div className="sidebar-collections">
+            {collections.map((col) => (
               <button
-                key={tag.name}
-                className={`sidebar-item ${filterTags.includes(tag.name) ? 'sidebar-item-active' : ''}`}
-                onClick={() => onToggleTag(tag.name)}
+                key={col.id}
+                className={`sidebar-item ${activeCollection === col.id ? 'sidebar-item-active' : ''}`}
+                onClick={() => onSelectCollection(col.id)}
               >
-                <span className="truncate">{tag.name}</span>
-                <span className="sidebar-count">{tag.count}</span>
+                <span className="truncate">{col.name}</span>
+                <span className="sidebar-count">{col.count}</span>
               </button>
             ))}
-            {tags.length === 0 && (
-              <p className="sidebar-empty">No tags yet</p>
+            {collections.length === 0 && !creating && (
+              <p className="sidebar-empty">No collections</p>
             )}
           </div>
         </div>
+
+        {todayCost.total > 0 && (
+          <div className="sidebar-today-cost">
+            <div className="sidebar-cost-header">Today</div>
+            {todayCost.byModel.map(([model, cost]) => (
+              <div key={model} className="sidebar-cost-row">
+                <span className="sidebar-cost-model truncate">{model}</span>
+                <span className="sidebar-cost-amount">${cost.toFixed(3)}</span>
+              </div>
+            ))}
+            <div className="sidebar-cost-row sidebar-cost-total">
+              <span>Total</span>
+              <span>${todayCost.total.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
 
         <div className="sidebar-footer">
           <button className="sidebar-item" onClick={onOpenDashboard}>
@@ -144,6 +201,12 @@ export function Sidebar({
         .sidebar-section {
           padding: var(--spacing-md) 0;
         }
+        .sidebar-section-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-right: var(--spacing-md);
+        }
         .sidebar-section-title {
           padding: var(--spacing-xs) var(--spacing-md);
           margin-bottom: var(--spacing-xs);
@@ -153,9 +216,39 @@ export function Sidebar({
           letter-spacing: 0.05em;
           color: var(--text-muted);
         }
-        .sidebar-tags {
-          max-height: 300px;
-          overflow-y: auto;
+        .sidebar-add-btn {
+          width: 22px;
+          height: 22px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          font-size: 16px;
+          font-weight: 500;
+          line-height: 1;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+        .sidebar-add-btn:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
+        }
+        .sidebar-create-input {
+          padding: var(--spacing-xs) var(--spacing-md);
+        }
+        .sidebar-create-input input {
+          width: 100%;
+          padding: var(--spacing-xs) var(--spacing-sm);
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          color: var(--text-primary);
+          font-size: 13px;
+        }
+        .sidebar-create-input input:focus {
+          outline: none;
+          border-color: var(--accent);
         }
         .sidebar-item {
           display: flex;
@@ -167,6 +260,7 @@ export function Sidebar({
           text-align: left;
           color: var(--text-secondary);
           transition: all var(--transition-fast);
+          cursor: pointer;
         }
         .sidebar-icon {
           flex-shrink: 0;
@@ -196,16 +290,47 @@ export function Sidebar({
           font-size: 13px;
         }
         .sidebar-collections {
-          max-height: 200px;
+          max-height: 300px;
           overflow-y: auto;
         }
-        .sidebar-collection {
-          cursor: default;
+        .sidebar-today-cost {
+          margin-top: auto;
+          padding: var(--spacing-sm) 0;
+          border-top: 1px solid var(--border);
+        }
+        .sidebar-cost-header {
+          padding: var(--spacing-xs) var(--spacing-md) 2px;
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+        }
+        .sidebar-cost-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 1px var(--spacing-md);
+          font-size: 12px;
+          color: var(--text-muted);
+        }
+        .sidebar-cost-model {
+          flex: 1;
+          min-width: 0;
+        }
+        .sidebar-cost-amount {
+          flex-shrink: 0;
+          font-variant-numeric: tabular-nums;
+          margin-left: var(--spacing-sm);
+        }
+        .sidebar-cost-total {
+          margin-top: 2px;
+          padding-top: 3px;
+          border-top: 1px solid var(--border);
           color: var(--text-secondary);
+          font-weight: 600;
         }
         .sidebar-footer {
-          margin-top: auto;
-          padding: var(--spacing-lg) 0 var(--spacing-md);
+          padding: var(--spacing-sm) 0 var(--spacing-md);
         }
       `}</style>
     </aside>

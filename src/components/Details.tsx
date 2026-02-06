@@ -1,17 +1,19 @@
 import { useState, useEffect, memo } from 'react';
 import Markdown from 'react-markdown';
-import type { Generation, ModelInfo } from '../lib/types';
+import type { Generation, ModelInfo, Collection } from '../lib/types';
 import { getImageUrl } from '../lib/api';
 import { TagChips } from './TagChips';
 
 interface DetailsProps {
   generation: Generation;
   models: ModelInfo[];
+  collections: Collection[];
   onClose: () => void;
   onToggleStar: () => void;
   onUpdateTitle: (title: string | null) => void;
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onAddToCollection: (collectionName: string) => void;
   onRemix: () => void;
   onReference: () => void;
   onTrash: () => void;
@@ -21,11 +23,13 @@ interface DetailsProps {
 export const Details = memo(function Details({
   generation,
   models,
+  collections,
   onClose,
   onToggleStar,
   onUpdateTitle,
   onAddTag,
   onRemoveTag,
+  onAddToCollection,
   onRemix,
   onReference,
   onTrash,
@@ -147,6 +151,27 @@ export const Details = memo(function Details({
             onRemove={onRemoveTag}
           />
         </div>
+
+        {/* Collection */}
+        {collections.length > 0 && (
+          <div className="details-section">
+            <label className="details-label">Collection</label>
+            <select
+              className="collection-select"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  onAddToCollection(e.target.value);
+                }
+              }}
+            >
+              <option value="">Add to collection...</option>
+              {collections.map((c) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Prompt (collapsible, read-only) */}
         <div className="details-section">
@@ -365,6 +390,25 @@ export const Details = memo(function Details({
           letter-spacing: 0.05em;
           display: block;
           margin-bottom: var(--spacing-xs);
+        }
+
+        /* Collection select */
+        .collection-select {
+          width: 100%;
+          padding: var(--spacing-xs) var(--spacing-sm);
+          background: var(--bg-primary);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          color: var(--text-secondary);
+          font-size: 13px;
+          cursor: pointer;
+        }
+        .collection-select:hover {
+          border-color: var(--border-light);
+        }
+        .collection-select:focus {
+          outline: none;
+          border-color: var(--accent);
         }
 
         /* Collapsible sections */
