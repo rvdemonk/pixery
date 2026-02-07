@@ -107,7 +107,7 @@ export const Gallery = memo(function Gallery({
           onLoadMoreRef.current();
         }
       },
-      { rootMargin: '200px' }
+      { root: containerRef.current, rootMargin: '200px' }
     );
 
     observer.observe(sentinel);

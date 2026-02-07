@@ -29,7 +29,7 @@ type View = 'gallery' | 'compare' | 'dashboard';
 
 export default function App() {
   // Filter state
-  const [filter, setFilter] = useState<ListFilter>({ limit: 100 });
+  const [filter, setFilter] = useState<ListFilter>({ limit: 100, starred_only: false, show_trashed: false, uncategorized: false });
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterModel, setFilterModel] = useState<string | null>(null);
   const [starredOnly, setStarredOnly] = useState(false);
@@ -683,6 +683,7 @@ export default function App() {
             await api.addToCollection(selectedId, collectionName);
             refreshCollections();
           }}
+          onFilterByTag={addFilterTag}
           onRemix={handleOpenRemix}
           onReference={handleOpenReference}
           onTrash={handleTrash}
