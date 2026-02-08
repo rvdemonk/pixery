@@ -175,8 +175,8 @@ export function RemixModal({
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 500;
-          backdrop-filter: blur(2px);
+          z-index: var(--z-popover);
+          backdrop-filter: blur(4px);
         }
 
         .remix-modal {
@@ -196,7 +196,6 @@ export function RemixModal({
           justify-content: space-between;
           align-items: center;
           padding: var(--spacing-md) var(--spacing-lg);
-          border-bottom: 1px solid var(--border);
         }
 
         .remix-header h2 {
@@ -272,8 +271,7 @@ export function RemixModal({
         .remix-label {
           color: var(--text-secondary);
           font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+          font-weight: 500;
         }
 
         .remix-references {
@@ -353,14 +351,14 @@ export function RemixModal({
 
         .remix-select {
           width: 100%;
-          min-height: 44px;
+          min-height: var(--input-height-lg);
           font-size: 15px;
           padding: var(--spacing-sm) var(--spacing-md);
         }
 
         .remix-tags-input {
           width: 100%;
-          min-height: 44px;
+          min-height: var(--input-height-lg);
           font-size: 15px;
           padding: var(--spacing-sm) var(--spacing-md);
         }
@@ -406,7 +404,7 @@ export function RemixModal({
 
         .remix-stepper-btn {
           width: 36px;
-          height: 44px;
+          height: var(--input-height-lg);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -430,7 +428,7 @@ export function RemixModal({
 
         .remix-stepper-value {
           width: 36px;
-          height: 44px;
+          height: var(--input-height-lg);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -450,7 +448,7 @@ export function RemixModal({
 
         .remix-generate {
           min-width: 140px;
-          min-height: 44px;
+          min-height: var(--input-height-lg);
           font-size: 15px;
         }
       `}</style>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Collection, TodayCost } from '../lib/types';
 
 interface SidebarProps {
@@ -40,8 +40,38 @@ export function Sidebar({
 }: SidebarProps) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const [open, setOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   const isAllActive = !starredOnly && !showTrashed && !showUncategorized && activeCollection === null;
+
+  // Close on click outside (only when open but not pinned)
+  useEffect(() => {
+    if (!open || pinned) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open, pinned]);
+
+  const handleHamburgerClick = () => {
+    if (pinned) {
+      onTogglePin();
+      setOpen(false);
+    } else if (open) {
+      setOpen(false);
+    } else {
+      setOpen(true);
+    }
+  };
+
+  const handlePin = () => {
+    onTogglePin();
+    setOpen(false);
+  };
 
   const handleCreateSubmit = () => {
     const trimmed = newName.trim();
@@ -52,9 +82,11 @@ export function Sidebar({
     setCreating(false);
   };
 
+  const sidebarClass = `sidebar ${pinned ? 'sidebar-pinned' : ''} ${open && !pinned ? 'sidebar-open' : ''}`;
+
   return (
-    <aside className={`sidebar ${pinned ? 'sidebar-pinned' : ''}`}>
-      <button className="sidebar-hamburger" onClick={onTogglePin} title={pinned ? 'Collapse sidebar' : 'Pin sidebar'}>
+    <aside ref={sidebarRef} className={sidebarClass}>
+      <button className="sidebar-hamburger" onClick={handleHamburgerClick} title={pinned ? 'Collapse sidebar' : 'Open sidebar'}>
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
           <rect y="3" width="20" height="2" rx="1" />
           <rect y="9" width="20" height="2" rx="1" />
@@ -62,8 +94,13 @@ export function Sidebar({
         </svg>
       </button>
       <div className="sidebar-content">
-        <div className="column-header">
+        <div className="sidebar-content-header">
           <h1 className="sidebar-title">pixery</h1>
+          <button className="sidebar-pin-btn" onClick={handlePin} title={pinned ? 'Unpin sidebar' : 'Pin sidebar'}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ transform: pinned ? 'rotate(45deg)' : 'none', transition: 'transform 150ms ease-out' }}>
+              <path d="M4.456.734a1.75 1.75 0 0 1 2.826.504l.613 1.327a3.08 3.08 0 0 0 2.084 1.707l2.454.584c1.332.317 1.8 1.972.832 2.94L11.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-2.204 2.205c-.968.968-2.623.5-2.94-.832l-.584-2.454a3.08 3.08 0 0 0-1.707-2.084l-1.327-.613a1.75 1.75 0 0 1-.504-2.826L4.456.734z"/>
+            </svg>
+          </button>
         </div>
 
         <div className="sidebar-section">
@@ -186,20 +223,42 @@ export function Sidebar({
         .sidebar-hamburger:hover {
           color: var(--text-primary);
         }
-        .sidebar-pinned .sidebar-hamburger {
+        .sidebar-pinned .sidebar-hamburger,
+        .sidebar-open .sidebar-hamburger {
           color: var(--accent);
         }
-        .sidebar-content .column-header {
-          border-bottom: none;
-          padding-bottom: var(--spacing-sm);
+        .sidebar-content-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          height: 56px;
+          padding: 0 var(--spacing-md);
         }
         .sidebar-title {
           font-size: 16px;
           font-weight: 700;
           color: var(--accent);
         }
+        .sidebar-pin-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+        .sidebar-pin-btn:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
+        }
+        .sidebar-pinned .sidebar-pin-btn {
+          color: var(--accent);
+        }
         .sidebar-section {
-          padding: var(--spacing-md) 0;
+          padding: var(--spacing-sm) 0;
         }
         .sidebar-section-header {
           display: flex;
@@ -217,14 +276,14 @@ export function Sidebar({
           color: var(--text-muted);
         }
         .sidebar-add-btn {
-          width: 22px;
-          height: 22px;
+          width: 32px;
+          height: 32px;
           display: flex;
           align-items: center;
           justify-content: center;
           border-radius: var(--radius-sm);
           color: var(--text-muted);
-          font-size: 16px;
+          font-size: 18px;
           font-weight: 500;
           line-height: 1;
           cursor: pointer;
@@ -261,6 +320,7 @@ export function Sidebar({
           color: var(--text-secondary);
           transition: all var(--transition-fast);
           cursor: pointer;
+          min-height: 36px;
         }
         .sidebar-icon {
           flex-shrink: 0;
@@ -277,8 +337,18 @@ export function Sidebar({
           color: var(--text-primary);
         }
         .sidebar-item-active {
-          background: var(--accent-muted);
           color: var(--text-primary);
+          position: relative;
+        }
+        .sidebar-item-active::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 4px;
+          bottom: 4px;
+          width: 3px;
+          background: var(--accent);
+          border-radius: 0 2px 2px 0;
         }
         .sidebar-count {
           font-size: 12px;
@@ -296,7 +366,6 @@ export function Sidebar({
         .sidebar-today-cost {
           margin-top: auto;
           padding: var(--spacing-sm) 0;
-          border-top: 1px solid var(--border);
         }
         .sidebar-cost-header {
           padding: var(--spacing-xs) var(--spacing-md) 2px;

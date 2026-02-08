@@ -115,7 +115,8 @@ export function Dashboard({ onClose }: DashboardProps) {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 100;
+          z-index: var(--z-modal);
+          backdrop-filter: blur(4px);
         }
         .dashboard-container {
           background: var(--bg-secondary);
@@ -125,13 +126,13 @@ export function Dashboard({ onClose }: DashboardProps) {
           display: flex;
           flex-direction: column;
           overflow: hidden;
+          box-shadow: var(--shadow-lg);
         }
         .dashboard-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           padding: var(--spacing-md) var(--spacing-lg);
-          border-bottom: 1px solid var(--border);
         }
         .dashboard-controls {
           display: flex;
@@ -151,7 +152,7 @@ export function Dashboard({ onClose }: DashboardProps) {
         .stat-card {
           background: var(--bg-primary);
           padding: var(--spacing-md);
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
           text-align: center;
         }
         .stat-value {
@@ -163,28 +164,30 @@ export function Dashboard({ onClose }: DashboardProps) {
         .stat-label {
           font-size: 12px;
           color: var(--text-muted);
-          text-transform: uppercase;
         }
         .dashboard-section {
           margin-bottom: var(--spacing-lg);
         }
         .dashboard-section h3 {
           margin-bottom: var(--spacing-sm);
-          font-size: 14px;
-          color: var(--text-secondary);
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text-muted);
         }
         .model-list {
           background: var(--bg-primary);
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
           padding: var(--spacing-sm);
         }
         .model-row {
           display: flex;
           justify-content: space-between;
           padding: var(--spacing-xs) var(--spacing-sm);
+          min-height: 32px;
+          align-items: center;
         }
-        .model-row:not(:last-child) {
-          border-bottom: 1px solid var(--border);
+        .model-row + .model-row {
+          border-top: 1px solid rgba(255,255,255,0.04);
         }
         .model-name {
           flex: 1;
@@ -202,7 +205,7 @@ export function Dashboard({ onClose }: DashboardProps) {
           gap: 4px;
           background: var(--bg-primary);
           padding: var(--spacing-md);
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
         }
         .day-bar-container {
           flex: 1;
@@ -216,19 +219,19 @@ export function Dashboard({ onClose }: DashboardProps) {
           cursor: pointer;
         }
         .day-bar-container:hover .day-bar {
-          background: var(--accent-hover, #9090ff);
+          background: var(--accent-hover);
         }
         .day-tooltip {
           position: absolute;
           top: -24px;
-          background: var(--bg-tertiary, #333);
+          background: var(--bg-tertiary);
           color: var(--text-primary);
           padding: 2px 6px;
           border-radius: var(--radius-sm);
           font-size: 11px;
           font-family: var(--font-mono);
           white-space: nowrap;
-          z-index: 10;
+          z-index: var(--z-dropdown);
         }
         .day-bar {
           width: 100%;
@@ -236,7 +239,7 @@ export function Dashboard({ onClose }: DashboardProps) {
           border-radius: var(--radius-sm) var(--radius-sm) 0 0;
           min-height: 2px;
           margin-top: auto;
-          transition: background 0.15s ease;
+          transition: background var(--transition-normal);
         }
         .day-label {
           font-size: 9px;

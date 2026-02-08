@@ -51,7 +51,8 @@ export function Compare({ left, right, onClose }: CompareProps) {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 100;
+          z-index: var(--z-modal);
+          backdrop-filter: blur(4px);
         }
         .compare-container {
           background: var(--bg-secondary);
@@ -62,13 +63,13 @@ export function Compare({ left, right, onClose }: CompareProps) {
           display: flex;
           flex-direction: column;
           overflow: hidden;
+          box-shadow: var(--shadow-lg);
         }
         .compare-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           padding: var(--spacing-md);
-          border-bottom: 1px solid var(--border);
         }
         .compare-content {
           display: flex;
@@ -89,7 +90,7 @@ export function Compare({ left, right, onClose }: CompareProps) {
         }
         .compare-image img {
           width: 100%;
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
         }
         .compare-info {
           display: flex;
@@ -110,7 +111,7 @@ export function Compare({ left, right, onClose }: CompareProps) {
           line-height: 1.5;
           background: var(--bg-primary);
           padding: var(--spacing-sm);
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
         }
       `}</style>
     </div>

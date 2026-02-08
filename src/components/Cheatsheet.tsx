@@ -47,8 +47,8 @@ export function Cheatsheet({ onClose }: CheatsheetProps) {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 200;
-          backdrop-filter: blur(2px);
+          z-index: var(--z-overlay);
+          backdrop-filter: blur(4px);
         }
         .cheatsheet {
           background: var(--bg-secondary);
@@ -64,7 +64,6 @@ export function Cheatsheet({ onClose }: CheatsheetProps) {
           justify-content: space-between;
           align-items: center;
           padding: var(--spacing-md);
-          border-bottom: 1px solid var(--border);
         }
         .cheatsheet-header h2 {
           font-size: 16px;
@@ -79,10 +78,9 @@ export function Cheatsheet({ onClose }: CheatsheetProps) {
           display: flex;
           align-items: center;
           padding: var(--spacing-sm) 0;
-          border-bottom: 1px solid var(--border);
         }
-        .cheatsheet-row:last-child {
-          border-bottom: none;
+        .cheatsheet-row + .cheatsheet-row {
+          border-top: 1px solid rgba(255,255,255,0.04);
         }
         .cheatsheet-key {
           min-width: 100px;
@@ -102,7 +100,6 @@ export function Cheatsheet({ onClose }: CheatsheetProps) {
         }
         .cheatsheet-footer {
           padding: var(--spacing-sm) var(--spacing-md);
-          border-top: 1px solid var(--border);
           text-align: center;
           font-size: 12px;
           color: var(--text-muted);

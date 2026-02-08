@@ -139,12 +139,15 @@ export function TagFilterBar({
           ref={inputRef}
           id="tag-filter-input"
           type="text"
-          placeholder={hasFilters ? "Add filter..." : "Filter by tag or model... (press /)"}
+          placeholder={hasFilters ? "Add filter..." : "Filter... (press /)"}
           value={inputValue}
           onChange={handleInputChange}
           onFocus={() => setShowDropdown(true)}
           onKeyDown={handleKeyDown}
           autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
         />
         {showDropdown && suggestions.length > 0 && (
           <div ref={dropdownRef} className="tag-suggestions">
@@ -237,11 +240,11 @@ export function TagFilterBar({
           margin-top: 4px;
           background: var(--bg-elevated);
           border: 1px solid var(--border);
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
           box-shadow: var(--shadow-lg);
           max-height: 240px;
           overflow-y: auto;
-          z-index: 100;
+          z-index: var(--z-dropdown);
         }
         .tag-suggestion {
           display: flex;
@@ -252,6 +255,7 @@ export function TagFilterBar({
           text-align: left;
           color: var(--text-secondary);
           transition: background var(--transition-fast);
+          min-height: 36px;
         }
         .tag-suggestion:hover,
         .tag-suggestion-highlighted {
@@ -270,7 +274,7 @@ export function TagFilterBar({
           font-size: 10px;
           text-transform: uppercase;
           letter-spacing: 0.03em;
-          padding: 1px 4px;
+          padding: 2px 6px;
           background: var(--accent-muted);
           color: var(--accent);
           border-radius: var(--radius-sm);
@@ -303,8 +307,8 @@ export function TagFilterBar({
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 14px;
-          height: 14px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
           color: var(--text-muted);
           transition: all var(--transition-fast);
@@ -318,9 +322,9 @@ export function TagFilterBar({
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 28px;
-          border-radius: var(--radius-md);
+          min-width: 32px;
+          min-height: 32px;
+          border-radius: var(--radius-sm);
           color: var(--text-muted);
           opacity: 0.4;
           cursor: default;

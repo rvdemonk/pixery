@@ -14,6 +14,7 @@ interface DetailsProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onAddToCollection: (collectionName: string) => void;
+  onFilterByTag: (tag: string) => void;
   onRemix: () => void;
   onReference: () => void;
   onTrash: () => void;
@@ -30,6 +31,7 @@ export const Details = memo(function Details({
   onAddTag,
   onRemoveTag,
   onAddToCollection,
+  onFilterByTag,
   onRemix,
   onReference,
   onTrash,
@@ -149,6 +151,7 @@ export const Details = memo(function Details({
             tags={generation.tags}
             onAdd={onAddTag}
             onRemove={onRemoveTag}
+            onClickTag={onFilterByTag}
           />
         </div>
 
@@ -293,12 +296,15 @@ export const Details = memo(function Details({
         }
         .details-image {
           padding: var(--spacing-md);
-          background: var(--bg-primary);
         }
         .details-image img {
           width: 100%;
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
           cursor: pointer;
+          transition: opacity var(--transition-fast);
+        }
+        .details-image img:hover {
+          opacity: 0.9;
         }
         .details-content {
           padding: var(--spacing-md);
@@ -370,6 +376,11 @@ export const Details = memo(function Details({
           cursor: pointer;
           color: var(--text-muted);
           padding: var(--spacing-xs);
+          min-width: 32px;
+          min-height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           transition: color var(--transition-fast), transform var(--transition-fast);
         }
         .star-btn:hover {
@@ -384,10 +395,9 @@ export const Details = memo(function Details({
           margin-bottom: var(--spacing-md);
         }
         .details-label {
-          color: var(--text-secondary);
+          color: var(--text-muted);
           font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+          font-weight: 500;
           display: block;
           margin-bottom: var(--spacing-xs);
         }
@@ -422,6 +432,7 @@ export const Details = memo(function Details({
           padding: var(--spacing-xs) 0;
           width: 100%;
           text-align: left;
+          min-height: 32px;
         }
         .collapse-header:hover .details-label {
           color: var(--text-primary);
@@ -430,6 +441,8 @@ export const Details = memo(function Details({
           font-size: 10px;
           color: var(--text-muted);
           transition: transform var(--transition-fast);
+          width: 16px;
+          text-align: center;
         }
         .collapse-arrow.expanded {
           transform: rotate(90deg);
@@ -481,7 +494,7 @@ export const Details = memo(function Details({
         .prompt-text {
           background: var(--bg-primary);
           padding: var(--spacing-sm);
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
           font-size: 13px;
           line-height: 1.5;
         }
@@ -529,7 +542,6 @@ export const Details = memo(function Details({
         .details-actions {
           margin-top: auto;
           padding-top: var(--spacing-md);
-          border-top: 1px solid var(--border);
         }
         .details-action-row {
           display: flex;
@@ -556,7 +568,7 @@ export const Details = memo(function Details({
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1000;
+          z-index: var(--z-lightbox);
         }
         .confirm-dialog {
           background: var(--bg-secondary);
@@ -564,7 +576,7 @@ export const Details = memo(function Details({
           border-radius: var(--radius-lg);
           max-width: 400px;
           width: 90%;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          box-shadow: var(--shadow-lg);
         }
         .confirm-dialog h3 {
           margin: 0 0 var(--spacing-sm) 0;

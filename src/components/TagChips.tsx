@@ -4,10 +4,11 @@ interface TagChipsProps {
   tags: string[];
   onAdd: (tag: string) => void;
   onRemove: (tag: string) => void;
+  onClickTag?: (tag: string) => void;
   editable?: boolean;
 }
 
-export function TagChips({ tags, onAdd, onRemove, editable = true }: TagChipsProps) {
+export function TagChips({ tags, onAdd, onRemove, onClickTag, editable = true }: TagChipsProps) {
   const [inputValue, setInputValue] = useState('');
   const [showInput, setShowInput] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -39,8 +40,10 @@ export function TagChips({ tags, onAdd, onRemove, editable = true }: TagChipsPro
   return (
     <div className="tag-chips">
       {tags.map((tag) => (
-        <span key={tag} className="chip">
-          {tag}
+        <span key={tag} className={`chip${onClickTag ? ' chip-clickable' : ''}`}>
+          <span className="chip-label" onClick={onClickTag ? () => onClickTag(tag) : undefined}>
+            {tag}
+          </span>
           {editable && (
             <button className="chip-remove" onClick={() => onRemove(tag)}>
               ×
@@ -74,11 +77,22 @@ export function TagChips({ tags, onAdd, onRemove, editable = true }: TagChipsPro
           flex-wrap: wrap;
           gap: var(--spacing-xs);
         }
+        .chip-clickable .chip-label {
+          cursor: pointer;
+        }
+        .chip-clickable .chip-label:hover {
+          color: var(--accent);
+        }
         .chip-remove {
-          margin-left: var(--spacing-xs);
+          margin-left: 2px;
           opacity: 0.6;
           font-size: 14px;
           line-height: 1;
+          min-width: 20px;
+          min-height: 20px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
         .chip-remove:hover {
           opacity: 1;

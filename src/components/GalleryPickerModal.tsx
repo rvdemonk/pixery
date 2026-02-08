@@ -101,17 +101,16 @@ export function GalleryPickerModal({
         .picker-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.7);
+          background: rgba(0, 0, 0, 0.8);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 600;
-          backdrop-filter: blur(2px);
+          z-index: var(--z-toast);
+          backdrop-filter: blur(4px);
         }
 
         .picker-modal {
           background: var(--bg-secondary);
-          border: 1px solid var(--border);
           border-radius: var(--radius-lg);
           width: 90%;
           max-width: 700px;
@@ -126,7 +125,6 @@ export function GalleryPickerModal({
           justify-content: space-between;
           align-items: center;
           padding: var(--spacing-md);
-          border-bottom: 1px solid var(--border);
         }
 
         .picker-header h2 {
@@ -135,8 +133,7 @@ export function GalleryPickerModal({
         }
 
         .picker-search {
-          padding: var(--spacing-md);
-          border-bottom: 1px solid var(--border);
+          padding: 0 var(--spacing-md) var(--spacing-md);
         }
 
         .picker-search input {
@@ -171,17 +168,16 @@ export function GalleryPickerModal({
           border-radius: var(--radius-sm);
           overflow: hidden;
           cursor: pointer;
-          border: 2px solid transparent;
-          transition: all var(--transition-fast);
+          transition: transform var(--transition-fast), box-shadow var(--transition-fast);
         }
 
         .picker-item:hover {
-          border-color: var(--accent);
-          transform: scale(1.02);
+          transform: scale(1.03);
+          box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
         }
 
         .picker-item-selected {
-          border-color: var(--success);
+          box-shadow: 0 0 0 2px var(--success);
           opacity: 0.7;
         }
 
@@ -224,7 +220,6 @@ export function GalleryPickerModal({
           justify-content: space-between;
           align-items: center;
           padding: var(--spacing-md);
-          border-top: 1px solid var(--border);
         }
 
         .picker-hint {

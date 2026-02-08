@@ -458,8 +458,8 @@ export function GenerateModal({
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 500;
-          backdrop-filter: blur(2px);
+          z-index: var(--z-popover);
+          backdrop-filter: blur(4px);
         }
 
         .genmodal {
@@ -479,7 +479,6 @@ export function GenerateModal({
           justify-content: space-between;
           align-items: center;
           padding: var(--spacing-md) var(--spacing-lg);
-          border-bottom: 1px solid var(--border);
         }
 
         .genmodal-header h2 {
@@ -514,6 +513,7 @@ export function GenerateModal({
 
         .genmodal-search input {
           width: 100%;
+          min-height: var(--input-height);
         }
 
         .genmodal-gallery {
@@ -608,14 +608,11 @@ export function GenerateModal({
         .genmodal-label {
           color: var(--text-secondary);
           font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+          font-weight: 500;
         }
 
         .genmodal-hint {
           font-size: 10px;
-          text-transform: none;
-          letter-spacing: normal;
           color: var(--text-muted);
         }
 
@@ -631,7 +628,7 @@ export function GenerateModal({
         .genmodal-select,
         .genmodal-input {
           width: 100%;
-          min-height: 40px;
+          min-height: var(--input-height);
           font-size: 14px;
           padding: var(--spacing-sm) var(--spacing-md);
         }
@@ -700,7 +697,7 @@ export function GenerateModal({
 
         .genmodal-stepper-btn {
           width: 36px;
-          height: 44px;
+          height: var(--input-height-lg);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -724,7 +721,7 @@ export function GenerateModal({
 
         .genmodal-stepper-value {
           width: 36px;
-          height: 44px;
+          height: var(--input-height-lg);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -744,7 +741,7 @@ export function GenerateModal({
 
         .genmodal-generate {
           min-width: 120px;
-          min-height: 44px;
+          min-height: var(--input-height-lg);
           font-size: 15px;
         }
 
@@ -873,7 +870,7 @@ export function GenerateModal({
           border: 1px solid var(--border);
           border-radius: var(--radius-md);
           box-shadow: var(--shadow-lg);
-          z-index: 10;
+          z-index: var(--z-dropdown);
           max-height: 200px;
           overflow-y: auto;
         }

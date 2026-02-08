@@ -265,7 +265,8 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 100;
+          z-index: var(--z-modal);
+          backdrop-filter: blur(4px);
         }
         .settings-container {
           background: var(--bg-secondary);
@@ -275,13 +276,13 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
           display: flex;
           flex-direction: column;
           overflow: hidden;
+          box-shadow: var(--shadow-lg);
         }
         .settings-header {
           display: flex;
           align-items: center;
           gap: var(--spacing-sm);
           padding: var(--spacing-md) var(--spacing-lg);
-          border-bottom: 1px solid var(--border);
         }
         .settings-header h2 {
           flex: 1;
@@ -354,10 +355,8 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
           margin-bottom: var(--spacing-lg);
         }
         .settings-tag-group h4 {
-          font-size: 11px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+          font-size: 12px;
+          font-weight: 500;
           color: var(--text-muted);
           margin-bottom: var(--spacing-sm);
         }
@@ -447,14 +446,14 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
         }
         .settings-status {
           padding: var(--spacing-md);
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
           background: var(--bg-primary);
         }
         .settings-status.status-ok {
-          border-left: 3px solid var(--success, #4ade80);
+          border-left: 3px solid var(--success);
         }
         .settings-status.status-error {
-          border-left: 3px solid var(--error, #f87171);
+          border-left: 3px solid var(--error);
         }
         .status-header {
           display: flex;

@@ -43,17 +43,20 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, marked,
       <style>{`
         .thumbnail {
           position: relative;
-          border-radius: var(--radius-md);
+          border-radius: var(--radius-sm);
           overflow: hidden;
           cursor: pointer;
-          border: 2px solid transparent;
-          transition: all var(--transition-fast);
+          transition: transform var(--transition-fast), box-shadow var(--transition-fast);
         }
         .thumbnail:hover {
-          border-color: var(--border-light);
+          transform: scale(1.03);
+          box-shadow: var(--shadow-md);
         }
         .thumbnail-selected {
-          border-color: var(--accent);
+          box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
+        }
+        .thumbnail-selected:hover {
+          box-shadow: 0 0 0 2px var(--accent), var(--shadow-md);
         }
         .thumbnail img {
           display: block;
@@ -64,8 +67,8 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, marked,
           position: absolute;
           top: var(--spacing-xs);
           left: var(--spacing-xs);
-          width: 20px;
-          height: 20px;
+          width: 22px;
+          height: 22px;
           background: var(--success);
           color: white;
           border-radius: 50%;
@@ -73,7 +76,7 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, marked,
           align-items: center;
           justify-content: center;
           z-index: 3;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+          box-shadow: var(--shadow-sm);
         }
         .thumbnail-star {
           position: absolute;
@@ -88,11 +91,12 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, marked,
           position: absolute;
           bottom: var(--spacing-xs);
           left: var(--spacing-xs);
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 600;
           color: rgba(255,255,255,0.85);
           text-shadow: 0 1px 4px rgba(0,0,0,0.9);
           z-index: 1;
+          transition: opacity var(--transition-fast);
         }
         .thumbnail:hover .thumbnail-id {
           opacity: 0;
@@ -103,7 +107,7 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, marked,
           left: 0;
           right: 0;
           padding: var(--spacing-sm) var(--spacing-md);
-          background: linear-gradient(transparent, rgba(0,0,0,0.85));
+          background: linear-gradient(transparent, rgba(0,0,0,0.6));
           opacity: 0;
           transition: opacity var(--transition-fast);
           display: flex;

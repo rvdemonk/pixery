@@ -220,11 +220,11 @@ export function BatchActionBar({
           align-items: center;
           gap: var(--spacing-md);
           padding: var(--spacing-sm) var(--spacing-md);
-          background: var(--bg-elevated);
-          border: 1px solid var(--border);
+          background: rgba(43, 42, 47, 0.85);
+          backdrop-filter: blur(12px);
           border-radius: var(--radius-lg);
           box-shadow: var(--shadow-lg);
-          z-index: 200;
+          z-index: var(--z-sticky);
         }
 
         .batch-count {
@@ -294,8 +294,8 @@ export function BatchActionBar({
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 28px;
+          min-width: 32px;
+          min-height: 32px;
           border-radius: 50%;
           background: transparent;
           color: var(--text-muted);
@@ -319,7 +319,7 @@ export function BatchActionBar({
           border-radius: var(--radius-md);
           box-shadow: var(--shadow-lg);
           min-width: 200px;
-          z-index: 210;
+          z-index: var(--z-overlay);
         }
 
         .tag-popover input {
@@ -372,14 +372,6 @@ export function BatchActionBar({
           justify-content: center;
         }
 
-        .btn-danger {
-          background: var(--error);
-          color: white;
-        }
-
-        .btn-danger:hover {
-          background: #c92c2c;
-        }
       `}</style>
     </div>
   );

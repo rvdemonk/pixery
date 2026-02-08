@@ -138,6 +138,12 @@ export function JobsIndicator({ jobs, activeCount, failedJobs, failedCount, onDi
       )}
 
       <style>{`
+        .jobs-indicators {
+          display: flex;
+          gap: var(--spacing-sm);
+          align-items: center;
+        }
+
         .jobs-indicator {
           position: relative;
           display: inline-flex;
@@ -148,12 +154,29 @@ export function JobsIndicator({ jobs, activeCount, failedJobs, failedCount, onDi
           align-items: center;
           gap: var(--spacing-xs);
           padding: var(--spacing-xs) var(--spacing-sm);
-          background: var(--surface-2);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-full);
-          font-size: var(--font-size-sm);
+          background: var(--bg-tertiary);
+          border-radius: 9999px;
+          font-size: 13px;
           color: var(--text-secondary);
           cursor: default;
+        }
+
+        .jobs-pill-failed {
+          background: rgba(239, 68, 68, 0.15);
+          color: var(--error);
+        }
+
+        .jobs-failed-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 14px;
+          height: 14px;
+          background: var(--error);
+          color: white;
+          border-radius: 50%;
+          font-size: 10px;
+          font-weight: bold;
         }
 
         .jobs-spinner {
@@ -176,45 +199,59 @@ export function JobsIndicator({ jobs, activeCount, failedJobs, failedCount, onDi
           margin-top: var(--spacing-xs);
           min-width: 280px;
           max-width: 360px;
-          background: #1a1a1a;
-          border: 1px solid var(--border);
+          background: var(--bg-primary);
           border-radius: var(--radius-md);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-          z-index: 100;
+          box-shadow: var(--shadow-lg);
+          z-index: var(--z-dropdown);
           overflow: hidden;
+        }
+
+        .jobs-tooltip-failed {
+          border-left: 3px solid var(--error);
+        }
+
+        .jobs-tooltip-title {
+          padding: var(--spacing-sm);
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--error);
+          border-bottom: 1px solid rgba(255,255,255,0.04);
         }
 
         .jobs-tooltip-item {
           padding: var(--spacing-sm);
-          border-bottom: 1px solid var(--border);
-          background: #1a1a1a;
+          background: var(--bg-primary);
         }
 
-        .jobs-tooltip-item:last-child {
-          border-bottom: none;
+        .jobs-tooltip-item + .jobs-tooltip-item {
+          border-top: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .jobs-tooltip-item-failed {
+          border-left: 3px solid var(--error);
         }
 
         .jobs-tooltip-header {
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          gap: var(--spacing-sm);
           margin-bottom: var(--spacing-xs);
         }
 
         .jobs-tooltip-model {
           font-weight: 500;
           color: var(--text-primary);
-          font-size: var(--font-size-sm);
+          font-size: 13px;
         }
 
         .jobs-tooltip-time {
-          font-size: var(--font-size-xs);
-          color: var(--text-tertiary);
+          font-size: 11px;
+          color: var(--text-muted);
           font-family: var(--font-mono);
         }
 
         .jobs-tooltip-prompt {
-          font-size: var(--font-size-sm);
+          font-size: 13px;
           color: var(--text-secondary);
           font-style: italic;
           line-height: 1.4;
@@ -228,49 +265,8 @@ export function JobsIndicator({ jobs, activeCount, failedJobs, failedCount, onDi
         }
 
         .jobs-tooltip-tag {
-          font-size: var(--font-size-xs);
+          font-size: 11px;
           color: var(--accent);
-        }
-
-        .jobs-indicators {
-          display: flex;
-          gap: var(--spacing-sm);
-          align-items: center;
-        }
-
-        .jobs-pill-failed {
-          background: rgba(239, 68, 68, 0.15);
-          border-color: rgba(239, 68, 68, 0.3);
-          color: #ef4444;
-        }
-
-        .jobs-failed-icon {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 14px;
-          height: 14px;
-          background: #ef4444;
-          color: white;
-          border-radius: 50%;
-          font-size: 10px;
-          font-weight: bold;
-        }
-
-        .jobs-tooltip-failed {
-          border-color: rgba(239, 68, 68, 0.3);
-        }
-
-        .jobs-tooltip-title {
-          padding: var(--spacing-sm);
-          font-size: var(--font-size-sm);
-          font-weight: 500;
-          color: #ef4444;
-          border-bottom: 1px solid var(--border);
-        }
-
-        .jobs-tooltip-item-failed {
-          border-left: 3px solid #ef4444;
         }
 
         .jobs-tooltip-error {
@@ -278,8 +274,8 @@ export function JobsIndicator({ jobs, activeCount, failedJobs, failedCount, onDi
           padding: var(--spacing-xs);
           background: rgba(239, 68, 68, 0.1);
           border-radius: var(--radius-sm);
-          font-size: var(--font-size-xs);
-          color: #ef4444;
+          font-size: 11px;
+          color: var(--error);
           font-family: var(--font-mono);
           word-break: break-word;
         }
@@ -287,29 +283,23 @@ export function JobsIndicator({ jobs, activeCount, failedJobs, failedCount, onDi
         .jobs-dismiss-btn {
           background: none;
           border: none;
-          color: var(--text-tertiary);
+          color: var(--text-muted);
           font-size: 16px;
           cursor: pointer;
-          padding: 0 4px;
+          padding: 0;
+          min-width: 24px;
+          min-height: 24px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           line-height: 1;
           margin-left: auto;
+          border-radius: var(--radius-sm);
         }
 
         .jobs-dismiss-btn:hover {
           color: var(--text-primary);
-        }
-
-        .jobs-tooltip-header {
-          display: flex;
-          align-items: center;
-          gap: var(--spacing-sm);
-          margin-bottom: var(--spacing-xs);
-        }
-
-        .jobs-tooltip-time {
-          font-size: var(--font-size-xs);
-          color: var(--text-tertiary);
-          font-family: var(--font-mono);
+          background: var(--bg-hover);
         }
       `}</style>
     </div>

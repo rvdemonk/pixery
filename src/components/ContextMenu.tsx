@@ -87,7 +87,7 @@ export function ContextMenu({
           padding: var(--spacing-xs);
           min-width: 140px;
           box-shadow: var(--shadow-lg);
-          z-index: 1000;
+          z-index: var(--z-lightbox);
         }
         .context-menu-item {
           display: block;
