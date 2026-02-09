@@ -16,3 +16,4 @@ Pillow>=10.0.0
 
 # Hugging Face downloads
 huggingface_hub>=0.20.0
+filelock>=3.13.0

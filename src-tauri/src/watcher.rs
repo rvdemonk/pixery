@@ -39,16 +39,20 @@ pub fn start_watcher(app: AppHandle, generations_dir: &Path) {
                             return false;
                         }
                         let path = &event.path;
-                        let is_png = path
+                        let is_image = path
                             .extension()
-                            .map(|ext| ext.eq_ignore_ascii_case("png"))
+                            .and_then(|ext| ext.to_str())
+                            .map(|ext| {
+                                let ext = ext.to_ascii_lowercase();
+                                ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "webp"
+                            })
                             .unwrap_or(false);
                         let is_thumb = path
                             .file_name()
                             .and_then(|n| n.to_str())
                             .map(|n| n.contains(".thumb."))
                             .unwrap_or(false);
-                        is_png && !is_thumb
+                        is_image && !is_thumb
                     });
 
                     if has_new_image {

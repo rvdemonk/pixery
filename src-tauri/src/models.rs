@@ -159,6 +159,44 @@ LIMITATIONS:
                 settings: Some("CFG: 7, Steps: 25, Sampler: Euler a, CLIP Skip: 2 (CRITICAL)"),
                 example: "score_9, score_8_up, score_7_up, score_6_up, score_5_up, score_4_up, source_anime, rating_safe, 1girl, silver hair, blue eyes, standing in rain, city night, neon lights reflecting on wet pavement",
             },
+            // FLUX 2 HDR Style - LoRA gallery model
+            PromptingGuide {
+                model_pattern: "flux2-hdr",
+                style: "prose",
+                required_prefix: None,
+                structure: "Just describe your subject — the HDR trigger word (Hyp3rRe4list1c) is auto-prepended",
+                tips: r#"- Trigger word 'Hyp3rRe4list1c' is AUTOMATICALLY added — do NOT include it in your prompt
+- Simply describe the subject; the model handles dramatic HDR lighting/color
+- Best for: product photography, fantasy landscapes, cinematic scenes
+- Adjust LoRA scale (0-2) to control HDR intensity: lower = subtle, higher = surreal
+- Default 40 inference steps; quality is high out of the box
+- Supports standard FLUX aspect ratios"#,
+                avoid: Some("including the trigger word manually (it's auto-prepended), overly technical HDR instructions (the model handles this)"),
+                negative_template: None,
+                settings: Some("Steps: 40 (default), LoRA Scale: 1.0 (default, range 0-2), Guidance: model default"),
+                example: "A weathered lighthouse on a rocky cliff at golden hour, waves crashing against the rocks below, dramatic clouds stretching across the sky",
+            },
+            // FLUX 2 base models (turbo, pro, max)
+            PromptingGuide {
+                model_pattern: "flux2",
+                style: "prose",
+                required_prefix: None,
+                structure: "Natural language description of the desired image",
+                tips: r#"- Natural prose prompting — describe what you want to see
+- FLUX 2 has strong text rendering — include exact text in quotes if needed
+- Three tiers with different tradeoffs:
+  flux2-turbo: Cheapest ($0.008/MP), fast, good for iteration and drafts
+  flux2-pro:   Mid-range ($0.03/MP), zero-config, consistent production quality
+  flux2-max:   Premium ($0.07/MP), zero-config, highest quality and realism
+- Pro and Max have NO tunable parameters (no steps, no guidance) — quality is automatic
+- Turbo supports guidance_scale (default 2.5) and inference steps (default 28)
+- All support seed for reproducibility
+- HEX color codes in prompt can guide palette (e.g. "background in #2D1B69")"#,
+                avoid: Some("booru tags (use prose instead), overly short prompts (more detail = better results)"),
+                negative_template: None,
+                settings: Some("Turbo: Steps 28, Guidance 2.5 (adjustable) | Pro/Max: no user-facing settings"),
+                example: "A cozy Japanese coffee shop interior at dusk, warm amber lighting from paper lanterns, a steaming cup of matcha latte on a worn wooden counter, rain visible through the window, soft bokeh lights from the street outside",
+            },
             // NoobAI - v-prediction model, different from epsilon models
             PromptingGuide {
                 model_pattern: "noobai",
@@ -292,10 +330,52 @@ impl ModelInfo {
                 max_refs: 0,
             },
             ModelInfo {
+                id: "flux2-turbo".into(),
+                provider: Provider::Fal,
+                display_name: "FLUX 2 Turbo".into(),
+                cost_per_image: 0.008,
+                max_refs: 0,
+            },
+            ModelInfo {
+                id: "flux2-pro".into(),
+                provider: Provider::Fal,
+                display_name: "FLUX 2 Pro".into(),
+                cost_per_image: 0.03,
+                max_refs: 0,
+            },
+            ModelInfo {
+                id: "flux2-max".into(),
+                provider: Provider::Fal,
+                display_name: "FLUX 2 Max".into(),
+                cost_per_image: 0.07,
+                max_refs: 0,
+            },
+            ModelInfo {
+                id: "flux2-hdr".into(),
+                provider: Provider::Fal,
+                display_name: "FLUX 2 HDR Style".into(),
+                cost_per_image: 0.021,
+                max_refs: 0,
+            },
+            ModelInfo {
                 id: "imagen4".into(),
                 provider: Provider::Fal,
                 display_name: "Imagen 4 (Preview)".into(),
                 cost_per_image: 0.04,
+                max_refs: 0,
+            },
+            ModelInfo {
+                id: "imagen4-fast".into(),
+                provider: Provider::Fal,
+                display_name: "Imagen 4 Fast".into(),
+                cost_per_image: 0.04,
+                max_refs: 0,
+            },
+            ModelInfo {
+                id: "imagen4-ultra".into(),
+                provider: Provider::Fal,
+                display_name: "Imagen 4 Ultra".into(),
+                cost_per_image: 0.06,
                 max_refs: 0,
             },
             // Z-Image Turbo: $0.005/MP. Routes to image-to-image endpoint when ref provided.
@@ -383,6 +463,7 @@ pub struct Generation {
     pub negative_prompt: Option<String>,
     pub tags: Vec<String>,
     pub references: Vec<Reference>,
+    pub collection_names: Vec<String>,
 }
 
 /// Parameters for generating a new image

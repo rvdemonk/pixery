@@ -32,6 +32,7 @@ vastai ssh-url <INSTANCE_ID>
 ./connect.sh <IP> <PORT>
 
 # First time on new instance — push code and setup (in separate terminal):
+# IMPORTANT: target is /workspace/inference/ (NOT /workspace/) — setup-instance.sh expects this path
 scp -P <PORT> server.py setup-instance.sh requirements.txt root@<IP>:/workspace/inference/
 
 # On Vast instance:

@@ -26,7 +26,13 @@ fn resolve_model(model: &str, has_reference: bool) -> &str {
         "flux-pro" | "fal-ai/flux-pro/v1.1" => "fal-ai/flux-pro/v1.1",
         "flux-ultra" | "fal-ai/flux-pro/v1.1-ultra" => "fal-ai/flux-pro/v1.1-ultra",
         "recraft" | "fal-ai/recraft-v3" => "fal-ai/recraft-v3",
+        "flux2-turbo" | "fal-ai/flux-2/turbo" => "fal-ai/flux-2/turbo",
+        "flux2-pro" | "fal-ai/flux-2-pro" => "fal-ai/flux-2-pro",
+        "flux2-max" | "fal-ai/flux-2-max" => "fal-ai/flux-2-max",
+        "flux2-hdr" | "fal-ai/flux-2-lora-gallery/hdr-style" => "fal-ai/flux-2-lora-gallery/hdr-style",
         "imagen4" | "fal-ai/imagen4/preview" => "fal-ai/imagen4/preview",
+        "imagen4-fast" | "fal-ai/imagen4/preview/fast" => "fal-ai/imagen4/preview/fast",
+        "imagen4-ultra" | "fal-ai/imagen4/preview/ultra" => "fal-ai/imagen4/preview/ultra",
         // Z-Image: route to image-to-image endpoint when reference provided
         "z-image" | "fal-ai/z-image/turbo" | "fal-ai/z-image/turbo/image-to-image" => {
             if has_reference {
@@ -138,7 +144,7 @@ pub async fn generate(
         None
     };
 
-    let uses_aspect_ratio = model_id == "fal-ai/imagen4/preview";
+    let uses_aspect_ratio = model_id.starts_with("fal-ai/imagen4/");
     let request = FalRequest {
         prompt: prompt.to_string(),
         image_url,
