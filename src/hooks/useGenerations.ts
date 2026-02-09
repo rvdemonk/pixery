@@ -53,7 +53,9 @@ function hasGenerationChanged(a: Generation, b: Generation): boolean {
     a.title !== b.title ||
     a.trashed_at !== b.trashed_at ||
     a.tags.length !== b.tags.length ||
-    a.tags.some((tag, i) => tag !== b.tags[i])
+    a.tags.some((tag, i) => tag !== b.tags[i]) ||
+    a.collection_names.length !== b.collection_names.length ||
+    a.collection_names.some((name, i) => name !== b.collection_names[i])
   );
 }
 

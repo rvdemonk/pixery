@@ -22,6 +22,7 @@ export interface Generation {
   negative_prompt: string | null;
   tags: string[];
   references: Reference[];
+  collection_names: string[];
 }
 
 export interface GenerateParams {

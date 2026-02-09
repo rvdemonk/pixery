@@ -681,6 +681,13 @@ export default function App() {
           onAddToCollection={async (collectionName) => {
             if (!selectedId) return;
             await api.addToCollection(selectedId, collectionName);
+            refresh();
+            refreshCollections();
+          }}
+          onRemoveFromCollection={async (collectionName) => {
+            if (!selectedId) return;
+            await api.removeFromCollection(selectedId, collectionName);
+            refresh();
             refreshCollections();
           }}
           onFilterByTag={addFilterTag}

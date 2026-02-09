@@ -225,6 +225,7 @@ impl Database {
                     negative_prompt: row.get(20)?,
                     tags: vec![],
                     references: vec![],
+                    collection_names: vec![],
                 })
             })
             .optional()?;
@@ -232,6 +233,7 @@ impl Database {
         if let Some(mut g) = gen {
             g.tags = self.get_tags_for_generation(g.id)?;
             g.references = self.get_references_for_generation(g.id)?;
+            g.collection_names = self.get_collections_for_generation(g.id)?;
             Ok(Some(g))
         } else {
             Ok(None)
@@ -370,6 +372,7 @@ impl Database {
                 negative_prompt: row.get(20)?,
                 tags: vec![],
                 references: vec![],
+                collection_names: vec![],
             })
         })?;
 
@@ -379,6 +382,7 @@ impl Database {
             let ids: Vec<i64> = generations.iter().map(|g| g.id).collect();
             let tags_map = self.get_tags_for_generations(&ids)?;
             let refs_map = self.get_references_for_generations(&ids)?;
+            let colls_map = self.get_collections_for_generations(&ids)?;
 
             for g in &mut generations {
                 if let Some(tags) = tags_map.get(&g.id) {
@@ -386,6 +390,9 @@ impl Database {
                 }
                 if let Some(refs) = refs_map.get(&g.id) {
                     g.references = refs.clone();
+                }
+                if let Some(colls) = colls_map.get(&g.id) {
+                    g.collection_names = colls.clone();
                 }
             }
         }
@@ -604,6 +611,42 @@ impl Database {
             tags.push(row?);
         }
         Ok(tags)
+    }
+
+    pub fn get_collections_for_generation(&self, generation_id: i64) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.name FROM collections c JOIN generation_collections gc ON c.id = gc.collection_id WHERE gc.generation_id = ?1 ORDER BY c.name",
+        )?;
+        let rows = stmt.query_map(params![generation_id], |row| row.get(0))?;
+        let mut names = vec![];
+        for row in rows {
+            names.push(row?);
+        }
+        Ok(names)
+    }
+
+    fn get_collections_for_generations(&self, ids: &[i64]) -> Result<HashMap<i64, Vec<String>>> {
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT gc.generation_id, c.name FROM generation_collections gc
+             JOIN collections c ON gc.collection_id = c.id
+             WHERE gc.generation_id IN ({})
+             ORDER BY c.name",
+            placeholders
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let params: Vec<Box<dyn rusqlite::ToSql>> = ids.iter().map(|id| Box::new(*id) as Box<dyn rusqlite::ToSql>).collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+        let mut map: HashMap<i64, Vec<String>> = HashMap::new();
+        let rows = stmt.query_map(params_refs.as_slice(), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+        for row in rows {
+            let (gen_id, name) = row?;
+            map.entry(gen_id).or_default().push(name);
+        }
+        Ok(map)
     }
 
     pub fn list_tags(&self) -> Result<Vec<TagCount>> {

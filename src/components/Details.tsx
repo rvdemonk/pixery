@@ -14,6 +14,7 @@ interface DetailsProps {
   onAddTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onAddToCollection: (collectionName: string) => void;
+  onRemoveFromCollection: (collectionName: string) => void;
   onFilterByTag: (tag: string) => void;
   onRemix: () => void;
   onReference: () => void;
@@ -31,6 +32,7 @@ export const Details = memo(function Details({
   onAddTag,
   onRemoveTag,
   onAddToCollection,
+  onRemoveFromCollection,
   onFilterByTag,
   onRemix,
   onReference,
@@ -40,7 +42,7 @@ export const Details = memo(function Details({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(generation.title || '');
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
-  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [promptExpanded, setPromptExpanded] = useState(true);
   const [metadataExpanded, setMetadataExpanded] = useState(false);
 
   // Sync local state when selected generation changes
@@ -48,7 +50,7 @@ export const Details = memo(function Details({
     setTitleValue(generation.title || '');
     setEditingTitle(false);
     setShowTrashConfirm(false);
-    setPromptExpanded(false);
+    setPromptExpanded(true);
     setMetadataExpanded(false);
   }, [generation.id]);
 
@@ -155,20 +157,37 @@ export const Details = memo(function Details({
           />
         </div>
 
+        {/* Remix / Reference */}
+        <div className="details-section">
+          <div className="details-action-row">
+            <button className="btn btn-primary details-action-btn" onClick={onRemix}>
+              Remix
+            </button>
+            <button className="btn btn-secondary details-action-btn" onClick={onReference}>
+              Reference
+            </button>
+          </div>
+        </div>
+
         {/* Collection */}
         {collections.length > 0 && (
           <div className="details-section">
             <label className="details-label">Collection</label>
             <select
               className="collection-select"
-              value=""
+              value={generation.collection_names[0] || ''}
               onChange={(e) => {
-                if (e.target.value) {
-                  onAddToCollection(e.target.value);
+                const newValue = e.target.value;
+                const current = generation.collection_names[0];
+                if (current && !newValue) {
+                  onRemoveFromCollection(current);
+                } else if (newValue && newValue !== current) {
+                  if (current) onRemoveFromCollection(current);
+                  onAddToCollection(newValue);
                 }
               }}
             >
-              <option value="">Add to collection...</option>
+              <option value="">No collection</option>
               {collections.map((c) => (
                 <option key={c.id} value={c.name}>{c.name}</option>
               ))}
@@ -247,16 +266,8 @@ export const Details = memo(function Details({
           )}
         </div>
 
-        {/* Actions (bottom) */}
+        {/* Trash (bottom) */}
         <div className="details-actions">
-          <div className="details-action-row">
-            <button className="btn btn-primary details-action-btn" onClick={onRemix}>
-              Remix
-            </button>
-            <button className="btn btn-secondary details-action-btn" onClick={onReference}>
-              Reference
-            </button>
-          </div>
           <button className="btn btn-ghost btn-danger-text" onClick={() => setShowTrashConfirm(true)}>
             Trash
           </button>
@@ -405,7 +416,8 @@ export const Details = memo(function Details({
         /* Collection select */
         .collection-select {
           width: 100%;
-          padding: var(--spacing-xs) var(--spacing-sm);
+          height: var(--input-height);
+          padding: var(--spacing-sm) var(--spacing-md);
           background: var(--bg-primary);
           border: 1px solid var(--border);
           border-radius: var(--radius-sm);
