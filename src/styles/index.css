@@ -9,6 +9,7 @@
 html, body, #root {
   height: 100%;
   width: 100%;
+  overscroll-behavior: none;
 }
 
 body {
@@ -231,7 +232,7 @@ h4 { font-size: 14px; }
 
 .btn-primary {
   background: var(--accent);
-  color: white;
+  color: var(--bg-primary);
 }
 
 .btn-primary:hover {

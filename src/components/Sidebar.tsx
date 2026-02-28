@@ -93,6 +93,7 @@ export function Sidebar({
           <rect y="15" width="20" height="2" rx="1" />
         </svg>
       </button>
+      <span className="sidebar-monogram">px</span>
       <div className="sidebar-content">
         <div className="sidebar-content-header">
           <h1 className="sidebar-title">pixery</h1>
@@ -227,6 +228,20 @@ export function Sidebar({
         .sidebar-open .sidebar-hamburger {
           color: var(--accent);
         }
+        .sidebar-monogram {
+          position: absolute;
+          bottom: var(--spacing-md);
+          left: 0;
+          width: 48px;
+          text-align: center;
+          font-family: var(--font-brand);
+          font-weight: 700;
+          font-size: 18px;
+          color: var(--text-muted);
+          letter-spacing: 0.03em;
+          user-select: none;
+          pointer-events: none;
+        }
         .sidebar-content-header {
           display: flex;
           align-items: center;
@@ -235,9 +250,11 @@ export function Sidebar({
           padding: 0 var(--spacing-md);
         }
         .sidebar-title {
-          font-size: 16px;
+          font-family: var(--font-brand);
+          font-size: 18px;
           font-weight: 700;
-          color: var(--accent);
+          letter-spacing: 0.04em;
+          color: var(--text-primary);
         }
         .sidebar-pin-btn {
           display: flex;

@@ -11,10 +11,10 @@
   --text-secondary: #9898a0;
   --text-muted: #8a8a92;
 
-  /* Accent — warm violet */
-  --accent: #9b8afb;
-  --accent-hover: #b0a4ff;
-  --accent-muted: #5a4f8d;
+  /* Accent — luminance only, no hue */
+  --accent: #d5d5db;
+  --accent-hover: #ededf0;
+  --accent-muted: #48484f;
 
   /* Borders */
   --border: #3a3a40;
@@ -40,6 +40,7 @@
   /* Typography */
   --font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-brand: 'Futura', 'Avenir Next', system-ui, sans-serif;
 
   /* Shadows — layered for depth */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1);
