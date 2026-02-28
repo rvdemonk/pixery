@@ -84,7 +84,12 @@ export const Details = memo(function Details({
     <div className="panel details-panel">
       <div className="column-header details-header">
         <h2>Details</h2>
-        <button className="btn btn-ghost btn-sm" onClick={onClose}>×</button>
+        <button className="details-close-btn" onClick={onClose}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="4" x2="14" y2="14" />
+            <line x1="14" y1="4" x2="4" y2="14" />
+          </svg>
+        </button>
       </div>
 
       <div className="details-image">
@@ -146,29 +151,6 @@ export const Details = memo(function Details({
           </div>
         )}
 
-        {/* Tags */}
-        <div className="details-section">
-          <label className="details-label">Tags</label>
-          <TagChips
-            tags={generation.tags}
-            onAdd={onAddTag}
-            onRemove={onRemoveTag}
-            onClickTag={onFilterByTag}
-          />
-        </div>
-
-        {/* Remix / Reference */}
-        <div className="details-section">
-          <div className="details-action-row">
-            <button className="btn btn-primary details-action-btn" onClick={onRemix}>
-              Remix
-            </button>
-            <button className="btn btn-secondary details-action-btn" onClick={onReference}>
-              Reference
-            </button>
-          </div>
-        </div>
-
         {/* Collection */}
         {collections.length > 0 && (
           <div className="details-section">
@@ -195,14 +177,39 @@ export const Details = memo(function Details({
           </div>
         )}
 
+        {/* Tags */}
+        <div className="details-section">
+          <label className="details-label">Tags</label>
+          <TagChips
+            tags={generation.tags}
+            onAdd={onAddTag}
+            onRemove={onRemoveTag}
+            onClickTag={onFilterByTag}
+          />
+        </div>
+
+        {/* Remix / Reference */}
+        <div className="details-section">
+          <div className="details-action-row">
+            <button className="btn btn-primary details-action-btn" onClick={onRemix}>
+              Remix
+            </button>
+            <button className="btn btn-secondary details-action-btn" onClick={onReference}>
+              Reference
+            </button>
+          </div>
+        </div>
+
         {/* Prompt (collapsible, read-only) */}
         <div className="details-section">
           <button
             className="collapse-header"
             onClick={() => setPromptExpanded(!promptExpanded)}
           >
-            <span className={`collapse-arrow ${promptExpanded ? 'expanded' : ''}`}>▶</span>
             <span className="details-label" style={{ marginBottom: 0 }}>Prompt</span>
+            <svg className={`collapse-chevron ${promptExpanded ? 'expanded' : ''}`} width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4 5.5 7 8.5 10 5.5" />
+            </svg>
           </button>
           {promptExpanded && (
             <div className="collapse-content">
@@ -219,8 +226,10 @@ export const Details = memo(function Details({
             className="collapse-header"
             onClick={() => setMetadataExpanded(!metadataExpanded)}
           >
-            <span className={`collapse-arrow ${metadataExpanded ? 'expanded' : ''}`}>▶</span>
             <span className="details-label" style={{ marginBottom: 0 }}>Metadata</span>
+            <svg className={`collapse-chevron ${metadataExpanded ? 'expanded' : ''}`} width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4 5.5 7 8.5 10 5.5" />
+            </svg>
           </button>
           {metadataExpanded && (
             <div className="collapse-content">
@@ -305,6 +314,27 @@ export const Details = memo(function Details({
         .details-header {
           justify-content: space-between;
         }
+        .details-header h2 {
+          font-family: var(--font-brand);
+          letter-spacing: 0.03em;
+        }
+        .details-close-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          border-radius: var(--radius-sm);
+          border: none;
+          background: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: background var(--transition-fast), color var(--transition-fast);
+        }
+        .details-close-btn:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
+        }
         .details-image {
           padding: var(--spacing-md);
         }
@@ -319,7 +349,7 @@ export const Details = memo(function Details({
         }
         .details-content {
           padding: var(--spacing-md);
-          overflow-y: auto;
+          overflow-y: scroll;
           flex: 1;
         }
 
@@ -374,9 +404,10 @@ export const Details = memo(function Details({
           margin-bottom: var(--spacing-md);
         }
         .model-badge {
-          font-size: 13px;
+          font-size: 12px;
           color: var(--text-secondary);
-          background: var(--bg-primary);
+          background: transparent;
+          border: 1px solid var(--border);
           padding: var(--spacing-xs) var(--spacing-sm);
           border-radius: var(--radius-sm);
         }
@@ -407,8 +438,10 @@ export const Details = memo(function Details({
         }
         .details-label {
           color: var(--text-muted);
-          font-size: 12px;
-          font-weight: 500;
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
           display: block;
           margin-bottom: var(--spacing-xs);
         }
@@ -437,11 +470,12 @@ export const Details = memo(function Details({
         .collapse-header {
           display: flex;
           align-items: center;
-          gap: var(--spacing-xs);
+          justify-content: space-between;
           background: none;
           border: none;
+          border-top: 1px solid var(--border);
           cursor: pointer;
-          padding: var(--spacing-xs) 0;
+          padding: var(--spacing-sm) 0;
           width: 100%;
           text-align: left;
           min-height: 32px;
@@ -449,15 +483,16 @@ export const Details = memo(function Details({
         .collapse-header:hover .details-label {
           color: var(--text-primary);
         }
-        .collapse-arrow {
-          font-size: 10px;
+        .collapse-chevron {
           color: var(--text-muted);
           transition: transform var(--transition-fast);
-          width: 16px;
-          text-align: center;
+          flex-shrink: 0;
         }
-        .collapse-arrow.expanded {
-          transform: rotate(90deg);
+        .collapse-chevron.expanded {
+          transform: rotate(180deg);
+        }
+        .collapse-header:hover .collapse-chevron {
+          color: var(--text-secondary);
         }
         .collapse-content {
           margin-top: var(--spacing-sm);
@@ -472,6 +507,9 @@ export const Details = memo(function Details({
         }
         .meta-label {
           color: var(--text-muted);
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
         }
         .text-mono {
           font-family: var(--font-mono);

@@ -805,6 +805,8 @@ export default function App() {
       <style>{`
         .main-header {
           gap: var(--spacing-md);
+          background: var(--bg-primary);
+          border-bottom: 1px solid var(--border);
         }
         .batch-progress {
           color: var(--accent);
@@ -815,20 +817,22 @@ export default function App() {
         .size-select {
           height: 36px;
           padding: 0 var(--spacing-md);
-          background: var(--bg-tertiary);
-          border: 1px solid var(--border);
+          background: transparent;
+          border: 1px solid transparent;
           border-radius: var(--radius-md);
-          color: var(--text-primary);
+          color: var(--text-secondary);
           font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
           font-weight: 500;
           cursor: pointer;
+          transition: all var(--transition-fast);
         }
         .size-select:hover {
-          border-color: var(--border-light);
+          border-color: var(--border);
+          color: var(--text-primary);
         }
         .size-select:focus {
           outline: none;
-          border-color: var(--accent);
+          border-color: var(--border-light);
         }
       `}</style>
     </div>

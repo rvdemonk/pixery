@@ -231,6 +231,16 @@ export function TagFilterBar({
         }
         .tag-filter-input-wrapper input {
           width: 100%;
+          background: transparent;
+          border-color: transparent;
+        }
+        .tag-filter-input-wrapper input:hover {
+          border-color: var(--border);
+        }
+        .tag-filter-input-wrapper input:focus {
+          background: var(--bg-secondary);
+          border-color: var(--border-light);
+          box-shadow: none;
         }
         .tag-suggestions {
           position: absolute;
@@ -315,8 +325,8 @@ export function TagFilterBar({
           flex-shrink: 0;
         }
         .tag-chip-remove:hover {
-          background: var(--accent);
-          color: white;
+          background: var(--bg-hover);
+          color: var(--text-primary);
         }
         .tag-filter-clear {
           display: flex;
