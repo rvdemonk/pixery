@@ -64,6 +64,7 @@ pub fn run() {
             commands::remove_from_collection,
             commands::delete_collection,
             commands::prompt_history,
+            commands::save_to_folder,
             commands::get_selfhosted_url,
             commands::set_selfhosted_url,
             commands::check_selfhosted_health,

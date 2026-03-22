@@ -7,11 +7,13 @@ export type ThumbnailSize = 'small' | 'medium' | 'large' | 'xl' | 'xxl';
 interface Settings {
   hiddenTags: string[];
   thumbnailSize: ThumbnailSize;
+  downloadFolder: string | null;
 }
 
 const defaultSettings: Settings = {
   hiddenTags: [],
   thumbnailSize: 'medium',
+  downloadFolder: null,
 };
 
 function loadSettings(): Settings {
@@ -63,6 +65,10 @@ export function useSettings() {
     setSettings((prev) => ({ ...prev, thumbnailSize: size }));
   }, []);
 
+  const setDownloadFolder = useCallback((folder: string | null) => {
+    setSettings((prev) => ({ ...prev, downloadFolder: folder }));
+  }, []);
+
   return {
     settings,
     hiddenTags: settings.hiddenTags,
@@ -70,5 +76,7 @@ export function useSettings() {
     isTagHidden,
     thumbnailSize: settings.thumbnailSize,
     setThumbnailSize,
+    downloadFolder: settings.downloadFolder,
+    setDownloadFolder,
   };
 }

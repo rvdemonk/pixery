@@ -265,6 +265,37 @@ pub fn prompt_history(
     db.prompt_history(limit).map_err(|e| e.to_string())
 }
 
+// Save image to external folder
+
+#[tauri::command]
+pub fn save_to_folder(
+    state: State<'_, AppState>,
+    id: i64,
+    folder: Option<String>,
+) -> Result<String, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let gen = db
+        .get_generation(id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Generation #{} not found", id))?;
+
+    let source = std::path::Path::new(&gen.image_path);
+    let filename = source
+        .file_name()
+        .ok_or("Invalid image path")?;
+
+    let dest_folder = match folder {
+        Some(f) => std::path::PathBuf::from(f),
+        None => dirs::download_dir()
+            .ok_or("Could not determine system Downloads folder")?,
+    };
+    let dest = dest_folder.join(filename);
+
+    archive::copy_to(source, &dest).map_err(|e| e.to_string())?;
+
+    Ok(dest.to_string_lossy().into_owned())
+}
+
 // Self-hosted server settings and health check commands
 
 #[tauri::command]

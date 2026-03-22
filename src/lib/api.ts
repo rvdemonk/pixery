@@ -107,6 +107,12 @@ export async function checkSelfhostedHealth(): Promise<SelfHostedStatus> {
   return invoke('check_selfhosted_health');
 }
 
+// Save to folder
+
+export async function saveToFolder(id: number, folder: string | null): Promise<string> {
+  return invoke('save_to_folder', { id, folder });
+}
+
 // Prompt history
 
 export async function promptHistory(limit: number): Promise<[number, string, string][]> {

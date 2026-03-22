@@ -105,7 +105,7 @@ export default function App() {
   }, [cloudModels, selfHostedStatus]);
 
   // Hooks
-  const { hiddenTags, toggleHiddenTag, thumbnailSize, setThumbnailSize } = useSettings();
+  const { hiddenTags, toggleHiddenTag, thumbnailSize, setThumbnailSize, downloadFolder, setDownloadFolder } = useSettings();
   const { tags: allTags, addTags, removeTag, refresh: refreshTags } = useTags();
   const { generating, progress: generateProgress, error: generateError, generate } = useGenerate();
   const { jobs, activeCount, failedJobs, failedCount, dismissFailedJob } = useJobs();
@@ -781,6 +781,7 @@ export default function App() {
           onReference={handleOpenReference}
           onTrash={handleTrash}
           onOpenFullViewer={() => setLightboxOpen(true)}
+          downloadFolder={downloadFolder}
         />
       )}
 
@@ -806,6 +807,8 @@ export default function App() {
           onToggleHiddenTag={toggleHiddenTag}
           onClose={() => setSettingsOpen(false)}
           onSelfHostedChange={refreshSelfHostedStatus}
+          downloadFolder={downloadFolder}
+          onSetDownloadFolder={setDownloadFolder}
         />
       )}
 

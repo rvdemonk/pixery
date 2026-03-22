@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from 'react';
 import Markdown from 'react-markdown';
 import type { Generation, ModelInfo, Collection } from '../lib/types';
-import { getImageUrl } from '../lib/api';
+import { getImageUrl, saveToFolder } from '../lib/api';
 import { TagChips } from './TagChips';
 
 interface DetailsProps {
@@ -20,6 +20,7 @@ interface DetailsProps {
   onReference: () => void;
   onTrash: () => void;
   onOpenFullViewer: () => void;
+  downloadFolder: string | null;
 }
 
 export const Details = memo(function Details({
@@ -38,12 +39,14 @@ export const Details = memo(function Details({
   onReference,
   onTrash,
   onOpenFullViewer,
+  downloadFolder,
 }: DetailsProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(generation.title || '');
   const [showTrashConfirm, setShowTrashConfirm] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(true);
   const [metadataExpanded, setMetadataExpanded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   // Sync local state when selected generation changes
   useEffect(() => {
@@ -52,7 +55,21 @@ export const Details = memo(function Details({
     setShowTrashConfirm(false);
     setPromptExpanded(true);
     setMetadataExpanded(false);
+    setSaveStatus('idle');
   }, [generation.id]);
+
+  const handleSave = async () => {
+    setSaveStatus('saving');
+    try {
+      await saveToFolder(generation.id, downloadFolder);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (e) {
+      console.error('Failed to save image:', e);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+  };
 
   const handleTitleSave = () => {
     const newTitle = titleValue.trim() || null;
@@ -82,14 +99,24 @@ export const Details = memo(function Details({
 
   return (
     <div className="panel details-panel">
-      <div className="column-header details-header">
-        <h2>Details</h2>
-        <button className="details-close-btn" onClick={onClose}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="4" y1="4" x2="14" y2="14" />
-            <line x1="14" y1="4" x2="4" y2="14" />
-          </svg>
-        </button>
+      <div className="details-header-bar">
+        <div className="details-header-top">
+          <span className="details-header-id">#{generation.id}</span>
+          <button className="details-close-btn" onClick={onClose}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="4" y1="4" x2="14" y2="14" />
+              <line x1="14" y1="4" x2="4" y2="14" />
+            </svg>
+          </button>
+        </div>
+        <div className="details-header-actions">
+          <button className="btn btn-primary details-header-btn" onClick={onRemix}>
+            Remix
+          </button>
+          <button className="btn btn-secondary details-header-btn" onClick={onReference}>
+            Reference
+          </button>
+        </div>
       </div>
 
       <div className="details-image">
@@ -101,9 +128,8 @@ export const Details = memo(function Details({
       </div>
 
       <div className="details-content">
-        {/* ID + Title */}
+        {/* Title */}
         <div className="details-title-section">
-          <span className="image-id">#{generation.id}</span>
           {editingTitle ? (
             <input
               type="text"
@@ -195,18 +221,6 @@ export const Details = memo(function Details({
           />
         </div>
 
-        {/* Remix / Reference */}
-        <div className="details-section">
-          <div className="details-action-row">
-            <button className="btn btn-primary details-action-btn" onClick={onRemix}>
-              Remix
-            </button>
-            <button className="btn btn-secondary details-action-btn" onClick={onReference}>
-              Reference
-            </button>
-          </div>
-        </div>
-
         {/* Prompt (collapsible, read-only) */}
         <div className="details-section">
           <button
@@ -282,8 +296,15 @@ export const Details = memo(function Details({
           )}
         </div>
 
-        {/* Trash (bottom) */}
+        {/* Save + Trash (bottom) */}
         <div className="details-actions">
+          <button
+            className={`btn btn-ghost details-save-btn ${saveStatus === 'saved' ? 'save-success' : saveStatus === 'error' ? 'save-error' : ''}`}
+            onClick={handleSave}
+            disabled={saveStatus === 'saving'}
+          >
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Failed' : 'Save to disk'}
+          </button>
           <button className="btn btn-ghost btn-danger-text" onClick={() => setShowTrashConfirm(true)}>
             Trash
           </button>
@@ -318,12 +339,31 @@ export const Details = memo(function Details({
           display: flex;
           flex-direction: column;
         }
-        .details-header {
-          justify-content: space-between;
+        .details-header-bar {
+          padding: var(--spacing-sm) var(--spacing-md);
+          border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
         }
-        .details-header h2 {
-          font-family: var(--font-brand);
-          letter-spacing: 0.03em;
+        .details-header-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: var(--spacing-sm);
+        }
+        .details-header-id {
+          font-family: var(--font-mono);
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--text-secondary);
+        }
+        .details-header-actions {
+          display: flex;
+          gap: var(--spacing-sm);
+        }
+        .details-header-btn {
+          flex: 1;
+          padding: var(--spacing-xs) var(--spacing-md);
+          font-size: 13px;
         }
         .details-close-btn {
           display: flex;
@@ -363,14 +403,6 @@ export const Details = memo(function Details({
         /* Title */
         .details-title-section {
           margin-bottom: var(--spacing-sm);
-        }
-        .image-id {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--text-muted);
-          font-family: var(--font-mono);
-          display: block;
-          margin-bottom: 2px;
         }
         .title-display {
           font-size: 18px;
@@ -616,14 +648,23 @@ export const Details = memo(function Details({
         .details-actions {
           margin-top: auto;
           padding-top: var(--spacing-md);
-        }
-        .details-action-row {
           display: flex;
-          gap: var(--spacing-sm);
-          margin-bottom: var(--spacing-sm);
+          flex-direction: column;
+          gap: 2px;
         }
-        .details-action-btn {
-          flex: 1;
+        .details-save-btn {
+          width: 100%;
+          color: var(--text-secondary);
+        }
+        .details-save-btn:hover {
+          color: var(--text-primary);
+          background: var(--bg-hover);
+        }
+        .details-save-btn.save-success {
+          color: var(--success, #4ade80);
+        }
+        .details-save-btn.save-error {
+          color: var(--error, #f87171);
         }
         .btn-danger-text {
           color: var(--text-muted);

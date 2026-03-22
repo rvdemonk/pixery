@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { open } from '@tauri-apps/plugin-dialog';
 import type { TagCount, SelfHostedStatus } from '../lib/types';
 import * as api from '../lib/api';
 
@@ -8,11 +9,13 @@ interface SettingsProps {
   onToggleHiddenTag: (tag: string) => void;
   onClose: () => void;
   onSelfHostedChange?: () => void;
+  downloadFolder: string | null;
+  onSetDownloadFolder: (folder: string | null) => void;
 }
 
-type SettingsSection = 'hidden-tags' | 'selfhosted' | null;
+type SettingsSection = 'hidden-tags' | 'selfhosted' | 'downloads' | null;
 
-export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfHostedChange }: SettingsProps) {
+export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfHostedChange, downloadFolder, onSetDownloadFolder }: SettingsProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>(null);
 
   // Self-hosted server state
@@ -75,6 +78,7 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
               <h2>
                 {activeSection === 'hidden-tags' && 'Hidden Tags'}
                 {activeSection === 'selfhosted' && 'Self-Hosted Server'}
+                {activeSection === 'downloads' && 'Downloads'}
               </h2>
             </>
           ) : (
@@ -114,6 +118,20 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
                   <span className="settings-menu-item-label">Hidden Tags</span>
                   <span className="settings-menu-item-value">
                     {hiddenTags.length > 0 ? `${hiddenTags.length} hidden` : 'None'}
+                  </span>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <button
+                className="settings-menu-item"
+                onClick={() => setActiveSection('downloads')}
+              >
+                <div className="settings-menu-item-content">
+                  <span className="settings-menu-item-label">Downloads</span>
+                  <span className="settings-menu-item-value">
+                    {downloadFolder || 'System default'}
                   </span>
                 </div>
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
@@ -201,6 +219,48 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
                     <div className="status-error-message">{serverStatus.error}</div>
                   )}
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeSection === 'downloads' && (
+            <div className="settings-section">
+              <p className="settings-description">
+                Choose where saved images are stored. If not set, images save to your system Downloads folder.
+              </p>
+
+              <div className="settings-field">
+                <label>Download folder</label>
+                <div className="download-folder-row">
+                  <span className="download-folder-path">
+                    {downloadFolder || 'Downloads (default)'}
+                  </span>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={async () => {
+                      const selected = await open({
+                        directory: true,
+                        multiple: false,
+                        title: 'Choose download folder',
+                        defaultPath: downloadFolder || undefined,
+                      });
+                      if (selected) {
+                        onSetDownloadFolder(selected as string);
+                      }
+                    }}
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
+
+              {downloadFolder && (
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => onSetDownloadFolder(null)}
+                >
+                  Reset to default
+                </button>
               )}
             </div>
           )}
@@ -494,6 +554,23 @@ export function Settings({ tags, hiddenTags, onToggleHiddenTag, onClose, onSelfH
           font-size: 12px;
           color: var(--error, #f87171);
           word-break: break-word;
+        }
+        .download-folder-row {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-sm);
+        }
+        .download-folder-path {
+          flex: 1;
+          font-size: 13px;
+          color: var(--text-secondary);
+          background: var(--bg-primary);
+          padding: var(--spacing-sm) var(--spacing-md);
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
       `}</style>
     </div>
