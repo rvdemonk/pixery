@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import type { Generation, ModelInfo, ListFilter, SelfHostedStatus, Collection, TodayCost } from './lib/types';
+import { open } from '@tauri-apps/plugin-dialog';
+import type { Generation, ModelInfo, ListFilter, SelfHostedStatus, Collection, TodayCost, SelectedRef, GenerateFormState } from './lib/types';
 import * as api from './lib/api';
 import { useGenerations } from './hooks/useGenerations';
 import { useTags } from './hooks/useTags';
@@ -11,7 +12,7 @@ import { useSettings } from './hooks/useSettings';
 import { Sidebar } from './components/Sidebar';
 import { Gallery } from './components/Gallery';
 import { Details } from './components/Details';
-import { GenerateModal, type GenerateModalInitialState } from './components/GenerateModal';
+import { GenerateModal } from './components/GenerateModal';
 import { Compare } from './components/Compare';
 import { Dashboard } from './components/Dashboard';
 import { Cheatsheet } from './components/Cheatsheet';
@@ -19,10 +20,10 @@ import { ContextMenu } from './components/ContextMenu';
 import { Lightbox } from './components/Lightbox';
 import { JobsIndicator } from './components/JobsIndicator';
 import { RemixModal } from './components/RemixModal';
-import { GalleryPickerModal } from './components/GalleryPickerModal';
 import { Settings } from './components/Settings';
 import { TagFilterBar } from './components/TagFilterBar';
 import { BatchActionBar } from './components/BatchActionBar';
+import { PickingBar } from './components/PickingBar';
 import type { Reference } from './lib/types';
 
 type View = 'gallery' | 'compare' | 'dashboard';
@@ -50,8 +51,6 @@ export default function App() {
 
   // UI state
   const [view, setView] = useState<View>('gallery');
-  const [generateOpen, setGenerateOpen] = useState(false);
-  const [generateInitialState, setGenerateInitialState] = useState<GenerateModalInitialState | undefined>(undefined);
   const [showHelp, setShowHelp] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(false);
@@ -61,9 +60,18 @@ export default function App() {
     position: { x: number; y: number };
   } | null>(null);
 
+  // Generate modal state (lifted from modal for persistence during picking)
+  const [generateFormState, setGenerateFormState] = useState<GenerateFormState | null>(null);
+  const [generateModalVisible, setGenerateModalVisible] = useState(false);
+  const [generateLineage, setGenerateLineage] = useState<SelectedRef[]>([]);
+
+  // Gallery picking mode (for selecting references)
+  const [galleryPickingMode, setGalleryPickingMode] = useState(false);
+  const [pickingRefs, setPickingRefs] = useState<SelectedRef[]>([]);
+  const [pickingTarget, setPickingTarget] = useState<'generate' | 'remix' | null>(null);
+
   // Remix state
   const [remixOpen, setRemixOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [remixReferences, setRemixReferences] = useState<Reference[]>([]);
 
   // Models
@@ -294,6 +302,29 @@ export default function App() {
     setRemixOpen(true);
   }, [selectedGeneration]);
 
+  // Open generate modal helper
+  const openGenerateModal = useCallback((initialState?: Partial<GenerateFormState>, lineage?: SelectedRef[]) => {
+    const defaultModel = models[0]?.id || '';
+    setGenerateFormState({
+      prompt: '',
+      model: defaultModel,
+      tagsInput: '',
+      references: [],
+      numRuns: 1,
+      negativePrompt: '',
+      advancedOpen: false,
+      ...initialState,
+    });
+    setGenerateLineage(lineage || []);
+    setGenerateModalVisible(true);
+  }, [models]);
+
+  const closeGenerateModal = useCallback(() => {
+    setGenerateModalVisible(false);
+    setGenerateFormState(null);
+    setGenerateLineage([]);
+  }, []);
+
   // Open generate modal with current image as a reference
   const handleOpenReference = useCallback(() => {
     if (!selectedGeneration) return;
@@ -302,24 +333,97 @@ export default function App() {
       path: ref.path,
       thumbPath: null,
     }));
-    setGenerateInitialState({
+    openGenerateModal({
       references: [{
         id: selectedGeneration.id,
         path: selectedGeneration.image_path,
         thumbPath: selectedGeneration.thumb_path,
       }],
-      lineage,
+    }, lineage);
+  }, [selectedGeneration, openGenerateModal]);
+
+  // Gallery picking mode handlers
+  const handlePickFromGallery = useCallback(() => {
+    setGenerateModalVisible(false);
+    setPickingRefs(generateFormState?.references || []);
+    setPickingTarget('generate');
+    setGalleryPickingMode(true);
+  }, [generateFormState]);
+
+  const handlePickFromGalleryRemix = useCallback(() => {
+    setRemixOpen(false);
+    setPickingRefs(remixReferences.map(r => ({
+      id: r.id,
+      path: r.path,
+      thumbPath: null,
+    })));
+    setPickingTarget('remix');
+    setGalleryPickingMode(true);
+  }, [remixReferences]);
+
+  const handlePickingDone = useCallback(() => {
+    if (pickingTarget === 'generate') {
+      setGenerateFormState(prev => prev ? { ...prev, references: [...pickingRefs] } : prev);
+      setGenerateModalVisible(true);
+    } else if (pickingTarget === 'remix') {
+      setRemixReferences(pickingRefs.map(r => ({
+        id: r.id,
+        hash: '',
+        path: r.path,
+        created_at: '',
+      })));
+      setRemixOpen(true);
+    }
+    setGalleryPickingMode(false);
+    setPickingRefs([]);
+    setPickingTarget(null);
+  }, [pickingRefs, pickingTarget]);
+
+  const handlePickingCancel = useCallback(() => {
+    setGalleryPickingMode(false);
+    setPickingRefs([]);
+    if (pickingTarget === 'generate') {
+      setGenerateModalVisible(true);
+    } else if (pickingTarget === 'remix') {
+      setRemixOpen(true);
+    }
+    setPickingTarget(null);
+  }, [pickingTarget]);
+
+  const handlePickToggle = useCallback((gen: Generation) => {
+    const ref: SelectedRef = { id: gen.id, path: gen.image_path, thumbPath: gen.thumb_path };
+    setPickingRefs(prev => {
+      if (prev.some(r => r.id === gen.id)) {
+        return prev.filter(r => r.id !== gen.id);
+      }
+      return [...prev, ref];
     });
-    setGenerateOpen(true);
-  }, [selectedGeneration]);
+  }, []);
+
+  // File dialog for references
+  const handlePickFromFile = useCallback(async () => {
+    const result = await open({
+      multiple: true,
+      directory: false,
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+    });
+    if (!result) return;
+    const paths = Array.isArray(result) ? result : [result];
+    const newRefs: SelectedRef[] = paths.map((filePath, i) => ({
+      id: -(Date.now() + i),
+      path: filePath,
+      thumbPath: null,
+    }));
+    setGenerateFormState(prev => prev ? {
+      ...prev,
+      references: [...prev.references, ...newRefs],
+    } : prev);
+  }, []);
 
   // Generate from remix modal
   const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[], tags: string[], numRuns: number = 1) => {
     if (!selectedGeneration) return;
-    // Close modals immediately
     setRemixOpen(false);
-    setPickerOpen(false);
-    // Generate in background
     const results = await generate({
       prompt,
       model,
@@ -338,25 +442,7 @@ export default function App() {
     }
   }, [selectedGeneration, generate, refresh, refreshTags, refreshTodayCost]);
 
-  // Add reference from gallery picker
-  const handleAddReferenceFromPicker = useCallback((generation: Generation) => {
-    // Create a pseudo-reference from the generation
-    const newRef: Reference = {
-      id: generation.id, // Using generation id as ref id for tracking
-      hash: '', // Not needed for display
-      path: generation.image_path,
-      created_at: generation.created_at,
-    };
-    // Don't add duplicates
-    setRemixReferences((prev) => {
-      if (prev.some((r) => r.path === newRef.path)) {
-        return prev;
-      }
-      return [...prev, newRef];
-    });
-  }, []);
-
-  // Remove reference
+  // Remove reference from remix
   const handleRemoveRemixReference = useCallback((refId: number) => {
     setRemixReferences((prev) => prev.filter((r) => r.id !== refId));
   }, []);
@@ -385,7 +471,7 @@ export default function App() {
   }, [selectedId, refresh]);
 
   const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[], referencePaths: string[], negativePrompt: string | null = null, numRuns: number = 1) => {
-    setGenerateOpen(false);
+    closeGenerateModal();
     const results = await generate({
       prompt,
       model,
@@ -490,9 +576,8 @@ export default function App() {
         path: g.image_path,
         thumbPath: g.thumb_path,
       }));
-    setGenerateInitialState({ references: refs });
-    setGenerateOpen(true);
-  }, [markedIds, generations]);
+    openGenerateModal({ references: refs });
+  }, [markedIds, generations, openGenerateModal]);
 
   const handleCompare = useCallback(() => {
     if (markedIds.size === 2) {
@@ -504,7 +589,6 @@ export default function App() {
 
   const handleBatchRegen = useCallback(() => {
     if (markedIds.size === 0) return;
-    // Use marked generations as refs, pre-fill from first selected
     const markedGenerations = generations.filter((g) => markedIds.has(g.id));
     if (markedGenerations.length === 0) return;
     const first = markedGenerations[0];
@@ -513,14 +597,13 @@ export default function App() {
       path: g.image_path,
       thumbPath: g.thumb_path,
     }));
-    setGenerateInitialState({
+    openGenerateModal({
       prompt: first.prompt,
       model: first.model,
-      tags: first.tags,
+      tagsInput: first.tags.join(', '),
       references: refs,
     });
-    setGenerateOpen(true);
-  }, [markedIds, generations]);
+  }, [markedIds, generations, openGenerateModal]);
 
   // Keyboard shortcuts
   useKeyboard({
@@ -537,20 +620,20 @@ export default function App() {
     },
     onRegenerate: handleOpenRemix,
     onFocusGenerate: () => {
-      setGenerateInitialState(undefined);
-      setGenerateOpen(true);
+      if (galleryPickingMode) return;
+      openGenerateModal();
     },
     onFocusSearch: () => document.getElementById('tag-filter-input')?.focus(),
     onShowHelp: () => setShowHelp(true),
     onEscape: () => {
       if (lightboxOpen) {
         setLightboxOpen(false);
+      } else if (galleryPickingMode) {
+        handlePickingCancel();
       } else if (contextMenu) {
         setContextMenu(null);
       } else if (settingsOpen) {
         setSettingsOpen(false);
-      } else if (pickerOpen) {
-        setPickerOpen(false);
       } else if (remixOpen) {
         setRemixOpen(false);
       } else if (showHelp) {
@@ -563,8 +646,8 @@ export default function App() {
         setBatchTagOpen(false);
       } else if (detailsOpen) {
         setDetailsOpen(false);
-      } else if (generateOpen) {
-        setGenerateOpen(false);
+      } else if (generateModalVisible) {
+        closeGenerateModal();
       } else {
         setSelectedId(null);
       }
@@ -639,10 +722,7 @@ export default function App() {
           />
           <button
             className="btn btn-primary"
-            onClick={() => {
-              setGenerateInitialState(undefined);
-              setGenerateOpen(true);
-            }}
+            onClick={() => openGenerateModal()}
           >
             Generate
           </button>
@@ -665,6 +745,9 @@ export default function App() {
           loadingMore={loadingMore}
           hasMore={hasMore}
           onLoadMore={loadMore}
+          pickingMode={galleryPickingMode}
+          pickedIds={new Set(pickingRefs.map(r => r.id))}
+          onPickToggle={handlePickToggle}
         />
       </main>
 
@@ -755,32 +838,39 @@ export default function App() {
           references={remixReferences}
           onClose={() => setRemixOpen(false)}
           onGenerate={handleRemixGenerate}
-          onAddReference={() => setPickerOpen(true)}
+          onAddReference={handlePickFromGalleryRemix}
           onRemoveReference={handleRemoveRemixReference}
         />
       )}
 
-      {pickerOpen && (
-        <GalleryPickerModal
-          selectedRefIds={new Set(remixReferences.map((r) => r.id))}
-          onSelect={handleAddReferenceFromPicker}
-          onClose={() => setPickerOpen(false)}
-        />
-      )}
-
-      {generateOpen && (
+      {generateFormState && generateModalVisible && (
         <GenerateModal
           models={models}
-          initialState={generateInitialState}
-          onClose={() => {
-            setGenerateOpen(false);
-            setGenerateInitialState(undefined);
-          }}
+          formState={generateFormState}
+          lineage={generateLineage}
+          onFormChange={setGenerateFormState}
+          onClose={closeGenerateModal}
           onGenerate={handleGenerate}
+          onPickFromGallery={handlePickFromGallery}
+          onPickFromFile={handlePickFromFile}
+          onRemoveRef={(refId) => {
+            setGenerateFormState(prev => prev ? {
+              ...prev,
+              references: prev.references.filter(r => r.id !== refId),
+            } : prev);
+          }}
         />
       )}
 
-      {markedIds.size > 0 && (
+      {galleryPickingMode && (
+        <PickingBar
+          selectedRefs={pickingRefs}
+          onDone={handlePickingDone}
+          onCancel={handlePickingCancel}
+        />
+      )}
+
+      {markedIds.size > 0 && !galleryPickingMode && (
         <BatchActionBar
           count={markedIds.size}
           availableTags={tags}

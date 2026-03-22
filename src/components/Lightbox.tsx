@@ -39,6 +39,7 @@ export function Lightbox({
   return (
     <div className="lightbox-backdrop" onClick={onClose}>
       <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+        <span className="lightbox-id">#{generation.id}</span>
         <img src={imageSrc} alt={generation.slug} />
       </div>
 
@@ -78,9 +79,20 @@ export function Lightbox({
           cursor: zoom-out;
         }
         .lightbox-content {
+          position: relative;
           max-width: 95vw;
           max-height: 95vh;
           cursor: default;
+        }
+        .lightbox-id {
+          position: absolute;
+          top: 0;
+          right: calc(100% + 10px);
+          font-size: 18px;
+          font-weight: 600;
+          font-family: var(--font-mono);
+          color: var(--text-muted);
+          white-space: nowrap;
         }
         .lightbox-content img {
           max-width: 95vw;

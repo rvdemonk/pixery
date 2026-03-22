@@ -99,6 +99,23 @@ export interface Reference {
   created_at: string;
 }
 
+export interface SelectedRef {
+  /** Generation ID for gallery-sourced refs, negative unique ID for file refs */
+  id: number;
+  path: string;
+  thumbPath: string | null;
+}
+
+export interface GenerateFormState {
+  prompt: string;
+  model: string;
+  tagsInput: string;
+  references: SelectedRef[];
+  numRuns: number;
+  negativePrompt: string;
+  advancedOpen: boolean;
+}
+
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed';
 export type JobSource = 'cli' | 'gui';
 

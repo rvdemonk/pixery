@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, memo } from 'react';
+import { useRef, useEffect, useCallback, useState, memo } from 'react';
 import type { Generation } from '../lib/types';
 import type { ThumbnailSize } from '../hooks/useSettings';
 import { Thumbnail } from './Thumbnail';
@@ -15,14 +15,18 @@ interface GalleryProps {
   loadingMore: boolean;
   hasMore: boolean;
   onLoadMore: () => void;
+  pickingMode?: boolean;
+  pickedIds?: Set<number>;
+  onPickToggle?: (generation: Generation) => void;
 }
 
-const GRID_SIZES: Record<ThumbnailSize, string> = {
-  small: '120px',
-  medium: '160px',
-  large: '220px',
-  xl: '400px',
-  xxl: '550px',
+
+const COLUMN_WIDTHS: Record<ThumbnailSize, number> = {
+  small: 140,
+  medium: 180,
+  large: 240,
+  xl: 420,
+  xxl: 570,
 };
 
 /**
@@ -32,6 +36,8 @@ const ThumbnailWrapper = memo(function ThumbnailWrapper({
   generation,
   selected,
   marked,
+  picked,
+  thumbnailSize,
   onSelect,
   onDoubleClick,
   onContextMenu,
@@ -39,6 +45,8 @@ const ThumbnailWrapper = memo(function ThumbnailWrapper({
   generation: Generation;
   selected: boolean;
   marked: boolean;
+  picked?: boolean;
+  thumbnailSize: ThumbnailSize;
   onSelect: (id: number, event: React.MouseEvent) => void;
   onDoubleClick: (id: number) => void;
   onContextMenu: (generation: Generation, position: { x: number; y: number }) => void;
@@ -55,6 +63,8 @@ const ThumbnailWrapper = memo(function ThumbnailWrapper({
       generation={generation}
       selected={selected}
       marked={marked}
+      picked={picked}
+      thumbnailSize={thumbnailSize}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
@@ -74,16 +84,34 @@ export const Gallery = memo(function Gallery({
   loadingMore,
   hasMore,
   onLoadMore,
+  pickingMode,
+  pickedIds,
+  onPickToggle,
 }: GalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const gridSize = GRID_SIZES[thumbnailSize];
+  const minColWidth = COLUMN_WIDTHS[thumbnailSize];
+  const [actualColWidth, setActualColWidth] = useState(minColWidth);
+  const gap = 8;
 
   // Use refs for values accessed in observer callback to avoid reconnecting observer
   const loadingMoreRef = useRef(loadingMore);
   const onLoadMoreRef = useRef(onLoadMore);
   loadingMoreRef.current = loadingMore;
   onLoadMoreRef.current = onLoadMore;
+
+  // Measure actual column width via ResizeObserver
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      const numCols = Math.max(1, Math.floor((w + gap) / (minColWidth + gap)));
+      setActualColWidth((w - gap * (numCols - 1)) / numCols);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [minColWidth]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -114,6 +142,26 @@ export const Gallery = memo(function Gallery({
     return () => observer.disconnect();
   }, [loading, hasMore]);
 
+  // In picking mode, clicks toggle pick instead of normal selection
+  const handlePickingSelect = useCallback((id: number, _event: React.MouseEvent) => {
+    if (onPickToggle) {
+      const gen = generations.find(g => g.id === id);
+      if (gen) onPickToggle(gen);
+    }
+  }, [generations, onPickToggle]);
+
+  const handlePickingDoubleClick = useCallback((id: number) => {
+    if (onPickToggle) {
+      const gen = generations.find(g => g.id === id);
+      if (gen) onPickToggle(gen);
+    }
+  }, [generations, onPickToggle]);
+
+  const getRowSpan = useCallback((gen: Generation) => {
+    const ratio = (gen.height && gen.width) ? gen.height / gen.width : 1;
+    return Math.ceil(actualColWidth * ratio) + gap;
+  }, [actualColWidth]);
+
   if (loading) {
     return (
       <div className="loading">
@@ -132,15 +180,21 @@ export const Gallery = memo(function Gallery({
   }
 
   return (
-    <div className="gallery" ref={containerRef} style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${gridSize}, 1fr))` }}>
+    <div
+      className="gallery"
+      ref={containerRef}
+      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${minColWidth}px, 1fr))` }}
+    >
       {generations.map((gen) => (
-        <div key={gen.id} data-id={gen.id}>
+        <div key={gen.id} data-id={gen.id} className="gallery-item" style={{ gridRowEnd: `span ${getRowSpan(gen)}` }}>
           <ThumbnailWrapper
             generation={gen}
-            selected={gen.id === selectedId}
-            marked={markedIds.has(gen.id)}
-            onSelect={onSelect}
-            onDoubleClick={onDoubleClick}
+            selected={!pickingMode && gen.id === selectedId}
+            marked={!pickingMode && markedIds.has(gen.id)}
+            picked={pickingMode && pickedIds?.has(gen.id)}
+            thumbnailSize={thumbnailSize}
+            onSelect={pickingMode ? handlePickingSelect : onSelect}
+            onDoubleClick={pickingMode ? handlePickingDoubleClick : onDoubleClick}
             onContextMenu={onContextMenu}
           />
         </div>
@@ -154,11 +208,16 @@ export const Gallery = memo(function Gallery({
       <style>{`
         .gallery {
           display: grid;
-          gap: var(--spacing-md);
-          padding: var(--spacing-md);
+          grid-auto-rows: 1px;
+          column-gap: ${gap}px;
+          padding: var(--spacing-sm);
           overflow-y: auto;
           flex: 1;
           align-content: start;
+        }
+        .gallery-item {
+          overflow: hidden;
+          margin-bottom: ${gap}px;
         }
         .gallery-sentinel {
           grid-column: 1 / -1;

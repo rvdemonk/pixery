@@ -1,44 +1,33 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { Generation, ModelInfo } from '../lib/types';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { ModelInfo, GenerateFormState, SelectedRef } from '../lib/types';
 import { getImageUrl, promptHistory } from '../lib/api';
-import * as api from '../lib/api';
-
-interface SelectedRef {
-  id: number;
-  path: string;
-  thumbPath: string | null;
-}
-
-export interface GenerateModalInitialState {
-  prompt?: string;
-  model?: string;
-  tags?: string[];
-  references?: SelectedRef[];
-  /** Lineage refs shown for quick-add (grandparents) */
-  lineage?: SelectedRef[];
-}
 
 interface GenerateModalProps {
   models: ModelInfo[];
-  initialState?: GenerateModalInitialState;
+  formState: GenerateFormState;
+  lineage: SelectedRef[];
+  onFormChange: (state: GenerateFormState) => void;
   onClose: () => void;
   onGenerate: (prompt: string, model: string, tags: string[], referencePaths: string[], negativePrompt: string | null, numRuns?: number) => void;
+  onPickFromGallery: () => void;
+  onPickFromFile: () => void;
+  onRemoveRef: (refId: number) => void;
 }
 
 export function GenerateModal({
   models,
-  initialState,
+  formState,
+  lineage,
+  onFormChange,
   onClose,
   onGenerate,
+  onPickFromGallery,
+  onPickFromFile,
+  onRemoveRef,
 }: GenerateModalProps) {
-  // Form state
-  const [prompt, setPrompt] = useState(initialState?.prompt || '');
-  const [negativePrompt, setNegativePrompt] = useState('');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(initialState?.model || models[0]?.id || '');
-  const [tagsInput, setTagsInput] = useState(initialState?.tags?.join(', ') || '');
-  const [selectedRefs, setSelectedRefs] = useState<SelectedRef[]>(initialState?.references || []);
-  const [numRuns, setNumRuns] = useState(1);
+  // "+ Reference" dropdown
+  const [refDropdownOpen, setRefDropdownOpen] = useState(false);
+  const refDropdownRef = useRef<HTMLDivElement>(null);
 
   // Prompt autocomplete
   const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
@@ -47,28 +36,32 @@ export function GenerateModal({
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
+  const { prompt, model: selectedModel, tagsInput, references, numRuns, negativePrompt, advancedOpen } = formState;
+
+  const update = useCallback((partial: Partial<GenerateFormState>) => {
+    onFormChange({ ...formState, ...partial });
+  }, [formState, onFormChange]);
+
   // Check if model is compatible with current ref count
-  const isModelCompatible = (model: ModelInfo, refCount: number) => {
+  const isModelCompatible = (m: ModelInfo, refCount: number) => {
     if (refCount === 0) return true;
-    return (model.max_refs ?? 0) >= refCount;
+    return (m.max_refs ?? 0) >= refCount;
   };
 
   // Auto-switch to compatible model when refs change
   useEffect(() => {
     const currentModel = models.find((m) => m.id === selectedModel);
-    if (currentModel && !isModelCompatible(currentModel, selectedRefs.length)) {
-      // Find first compatible model
-      const compatibleModel = models.find((m) => isModelCompatible(m, selectedRefs.length));
+    if (currentModel && !isModelCompatible(currentModel, references.length)) {
+      const compatibleModel = models.find((m) => isModelCompatible(m, references.length));
       if (compatibleModel) {
-        setSelectedModel(compatibleModel.id);
+        update({ model: compatibleModel.id });
       }
     }
-  }, [selectedRefs.length, models, selectedModel]);
+  }, [references.length, models, selectedModel]);
 
   // Fetch recent prompts on mount
   useEffect(() => {
     promptHistory(50).then((rows) => {
-      // Deduplicate prompts, keep most recent
       const seen = new Set<string>();
       const unique: string[] = [];
       for (const [, p] of rows) {
@@ -99,92 +92,38 @@ export function GenerateModal({
 
   const handlePromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
-    setPrompt(value);
+    update({ prompt: value });
     updateSuggestions(value);
-  }, [updateSuggestions]);
+  }, [update, updateSuggestions]);
 
   const handleSelectSuggestion = useCallback((suggestion: string) => {
-    setPrompt(suggestion);
+    update({ prompt: suggestion });
     setShowSuggestions(false);
     promptRef.current?.focus();
-  }, []);
+  }, [update]);
 
-  // Close suggestions on click outside
+  // Close suggestions and ref dropdown on click outside
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
           promptRef.current && !promptRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
       }
+      if (refDropdownRef.current && !refDropdownRef.current.contains(e.target as Node)) {
+        setRefDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Gallery browser state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [generations, setGenerations] = useState<Generation[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Preview state - which ref is being previewed larger
-  const [previewRef, setPreviewRef] = useState<SelectedRef | null>(null);
-
-  // Load gallery
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        if (searchQuery.trim()) {
-          const results = await api.searchGenerations(searchQuery, 100);
-          setGenerations(results);
-        } else {
-          const results = await api.listGenerations({ limit: 100 });
-          setGenerations(results);
-        }
-      } catch (e) {
-        console.error('Failed to load generations:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [searchQuery]);
-
-  const selectedRefIds = useMemo(() => new Set(selectedRefs.map((r) => r.id)), [selectedRefs]);
-
-  const handleToggleRef = (gen: Generation) => {
-    const ref: SelectedRef = {
-      id: gen.id,
-      path: gen.image_path,
-      thumbPath: gen.thumb_path,
-    };
-
-    setSelectedRefs((prev) => {
-      if (prev.some((r) => r.id === gen.id)) {
-        return prev.filter((r) => r.id !== gen.id);
-      }
-      return [...prev, ref];
-    });
-  };
-
-  const handleRemoveRef = (refId: number) => {
-    setSelectedRefs((prev) => prev.filter((r) => r.id !== refId));
-    if (previewRef?.id === refId) {
-      setPreviewRef(null);
-    }
-  };
-
   const handleAddLineageRef = (ref: SelectedRef) => {
-    setSelectedRefs((prev) => {
-      if (prev.some((r) => r.id === ref.id)) {
-        return prev;
-      }
-      return [...prev, ref];
-    });
+    if (references.some((r) => r.id === ref.id)) return;
+    update({ references: [...references, ref] });
   };
 
   const handleGenerate = () => {
-    const referencePaths = selectedRefs.map((ref) => ref.path);
+    const referencePaths = references.map((ref) => ref.path);
     const tags = tagsInput
       .split(',')
       .map((t) => t.trim())
@@ -192,8 +131,9 @@ export function GenerateModal({
     onGenerate(prompt, selectedModel, tags, referencePaths, negativePrompt.trim() || null, numRuns);
   };
 
-  const lineageRefs = initialState?.lineage || [];
-  const hasLineage = lineageRefs.length > 0;
+  const selectedRefIds = new Set(references.map((r) => r.id));
+  const costPerImage = models.find((m) => m.id === selectedModel)?.cost_per_image ?? 0;
+  const estimatedCost = costPerImage * numRuns;
 
   return (
     <div className="genmodal-overlay" onClick={onClose}>
@@ -206,247 +146,201 @@ export function GenerateModal({
         </div>
 
         <div className="genmodal-body">
-          {/* Left: Gallery browser */}
-          <div className="genmodal-browser">
-            <div className="genmodal-search">
-              <input
-                type="text"
-                placeholder="Search gallery..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-              />
-            </div>
-
-            <div className="genmodal-gallery">
-              {loading ? (
-                <div className="genmodal-loading">Loading...</div>
-              ) : generations.length === 0 ? (
-                <div className="genmodal-empty">No images found</div>
-              ) : (
-                generations.map((gen) => {
-                  const isSelected = selectedRefIds.has(gen.id);
-                  return (
-                    <div
-                      key={gen.id}
-                      className={`genmodal-thumb ${isSelected ? 'genmodal-thumb-selected' : ''}`}
-                      onClick={() => handleToggleRef(gen)}
-                      title={gen.prompt.slice(0, 100)}
-                    >
-                      <img
-                        src={getImageUrl(gen.thumb_path || gen.image_path)}
-                        alt={gen.slug}
-                      />
-                      {isSelected && <span className="genmodal-check">✓</span>}
-                      <span className="genmodal-id">#{gen.id}</span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+          {/* Model */}
+          <div className="genmodal-section">
+            <label className="genmodal-label">Model</label>
+            <select
+              value={selectedModel}
+              onChange={(e) => update({ model: e.target.value })}
+              className="genmodal-select"
+            >
+              {models.map((m) => {
+                const compatible = isModelCompatible(m, references.length);
+                const maxRefs = m.max_refs ?? 0;
+                return (
+                  <option key={m.id} value={m.id} disabled={!compatible}>
+                    {m.display_name} (${m.cost_per_image.toFixed(3)})
+                    {!compatible && ` - max ${maxRefs} ref${maxRefs !== 1 ? 's' : ''}`}
+                  </option>
+                );
+              })}
+            </select>
           </div>
 
-          {/* Right: Editor */}
-          <div className="genmodal-editor">
-            {/* Model */}
+          {/* Tags */}
+          <div className="genmodal-section">
+            <label className="genmodal-label">Tags</label>
+            <input
+              type="text"
+              className="genmodal-input"
+              value={tagsInput}
+              onChange={(e) => update({ tagsInput: e.target.value })}
+              placeholder="tag1, tag2, ..."
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+            />
+          </div>
+
+          {/* Lineage quick-add */}
+          {lineage.length > 0 && (
             <div className="genmodal-section">
-              <label className="genmodal-label">Model</label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="genmodal-select"
-              >
-                {models.map((m) => {
-                  const compatible = isModelCompatible(m, selectedRefs.length);
-                  const maxRefs = m.max_refs ?? 0;
+              <label className="genmodal-label">
+                Lineage <span className="genmodal-hint">(click to add)</span>
+              </label>
+              <div className="genmodal-lineage">
+                {lineage.map((ref) => {
+                  const alreadyAdded = selectedRefIds.has(ref.id);
                   return (
-                    <option key={m.id} value={m.id} disabled={!compatible}>
-                      {m.display_name} (${m.cost_per_image.toFixed(3)})
-                      {!compatible && ` - max ${maxRefs} ref${maxRefs !== 1 ? 's' : ''}`}
-                    </option>
+                    <div
+                      key={ref.id}
+                      className={`genmodal-lineage-thumb ${alreadyAdded ? 'genmodal-lineage-added' : ''}`}
+                      onClick={() => !alreadyAdded && handleAddLineageRef(ref)}
+                      title={alreadyAdded ? 'Already added' : 'Click to add'}
+                    >
+                      <img src={getImageUrl(ref.thumbPath || ref.path)} alt={`#${ref.id}`} />
+                      <span className="genmodal-id">#{ref.id}</span>
+                      {alreadyAdded && <span className="genmodal-check">✓</span>}
+                    </div>
                   );
                 })}
-              </select>
-              {selectedRefs.length > 0 && (
-                <span className="genmodal-hint" style={{ marginTop: '4px' }}>
-                  {selectedRefs.length} ref{selectedRefs.length !== 1 ? 's' : ''} selected - some models may be unavailable
-                </span>
-              )}
-            </div>
-
-            {/* Tags */}
-            <div className="genmodal-section">
-              <label className="genmodal-label">Tags</label>
-              <input
-                type="text"
-                className="genmodal-input"
-                value={tagsInput}
-                onChange={(e) => setTagsInput(e.target.value)}
-                placeholder="tag1, tag2, ..."
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-              />
-            </div>
-
-            {/* Lineage quick-add */}
-            {hasLineage && (
-              <div className="genmodal-section">
-                <label className="genmodal-label">
-                  Lineage <span className="genmodal-hint">(click to add)</span>
-                </label>
-                <div className="genmodal-lineage">
-                  {lineageRefs.map((ref) => {
-                    const alreadyAdded = selectedRefIds.has(ref.id);
-                    return (
-                      <div
-                        key={ref.id}
-                        className={`genmodal-lineage-thumb ${alreadyAdded ? 'genmodal-lineage-added' : ''}`}
-                        onClick={() => !alreadyAdded && handleAddLineageRef(ref)}
-                        title={alreadyAdded ? 'Already added' : 'Click to add'}
-                      >
-                        <img src={getImageUrl(ref.thumbPath || ref.path)} alt={`#${ref.id}`} />
-                        <span className="genmodal-id">#{ref.id}</span>
-                        {alreadyAdded && <span className="genmodal-check">✓</span>}
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Prompt */}
-            <div className="genmodal-section genmodal-prompt-section">
-              <label className="genmodal-label">Prompt</label>
-              <div className="genmodal-prompt-wrapper">
-                <textarea
-                  ref={promptRef}
-                  className="genmodal-prompt"
-                  value={prompt}
-                  onChange={handlePromptChange}
-                  onFocus={() => updateSuggestions(prompt)}
-                  placeholder="Describe what you want to generate..."
-                  autoFocus
-                />
-                {showSuggestions && suggestions.length > 0 && (
-                  <div className="genmodal-suggestions" ref={suggestionsRef}>
-                    {suggestions.map((s, i) => (
-                      <button
-                        key={i}
-                        className="genmodal-suggestion"
-                        onClick={() => handleSelectSuggestion(s)}
-                      >
-                        {s.length > 80 ? s.slice(0, 80) + '...' : s}
-                      </button>
-                    ))}
+          {/* References */}
+          <div className="genmodal-section">
+            <label className="genmodal-label">
+              References ({references.length})
+            </label>
+            <div className="genmodal-refs">
+              {references.map((ref) => (
+                <div key={ref.id} className="genmodal-ref-thumb">
+                  <img src={getImageUrl(ref.thumbPath || ref.path)} alt={ref.id > 0 ? `#${ref.id}` : 'file'} />
+                  {ref.id > 0 && <span className="genmodal-ref-id">#{ref.id}</span>}
+                  <button
+                    className="genmodal-ref-remove"
+                    onClick={() => onRemoveRef(ref.id)}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <div className="genmodal-ref-add-wrapper" ref={refDropdownRef}>
+                <button
+                  className="genmodal-ref-add"
+                  onClick={() => setRefDropdownOpen(!refDropdownOpen)}
+                >
+                  + Reference
+                </button>
+                {refDropdownOpen && (
+                  <div className="genmodal-ref-dropdown">
+                    <button
+                      className="genmodal-ref-option"
+                      onClick={() => {
+                        setRefDropdownOpen(false);
+                        onPickFromGallery();
+                      }}
+                    >
+                      Gallery
+                    </button>
+                    <button
+                      className="genmodal-ref-option"
+                      onClick={() => {
+                        setRefDropdownOpen(false);
+                        onPickFromFile();
+                      }}
+                    >
+                      File
+                    </button>
                   </div>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Advanced */}
-            <div className="genmodal-section">
-              <button
-                className="genmodal-advanced-toggle"
-                onClick={() => setAdvancedOpen(!advancedOpen)}
-              >
-                {advancedOpen ? '▾' : '▸'} Advanced
-              </button>
-              {advancedOpen && (
-                <div className="genmodal-advanced">
-                  <label className="genmodal-label">Negative Prompt</label>
-                  <textarea
-                    className="genmodal-negative-prompt"
-                    value={negativePrompt}
-                    onChange={(e) => setNegativePrompt(e.target.value)}
-                    placeholder="Things to avoid..."
-                  />
+          {/* Prompt */}
+          <div className="genmodal-section genmodal-prompt-section">
+            <label className="genmodal-label">Prompt</label>
+            <div className="genmodal-prompt-wrapper">
+              <textarea
+                ref={promptRef}
+                className="genmodal-prompt"
+                value={prompt}
+                onChange={handlePromptChange}
+                onFocus={() => updateSuggestions(prompt)}
+                placeholder="Describe what you want to generate..."
+                autoFocus
+              />
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="genmodal-suggestions" ref={suggestionsRef}>
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      className="genmodal-suggestion"
+                      onClick={() => handleSelectSuggestion(s)}
+                    >
+                      {s.length > 80 ? s.slice(0, 80) + '...' : s}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Generate button */}
-            <div className="genmodal-actions">
-              <div className="genmodal-runs">
-                <label className="genmodal-runs-label">Runs</label>
-                <div className="genmodal-stepper">
-                  <button
-                    className="genmodal-stepper-btn"
-                    onClick={() => setNumRuns(Math.max(1, numRuns - 1))}
-                    disabled={numRuns <= 1}
-                  >
-                    −
-                  </button>
-                  <span className="genmodal-stepper-value">{numRuns}</span>
-                  <button
-                    className="genmodal-stepper-btn"
-                    onClick={() => setNumRuns(Math.min(20, numRuns + 1))}
-                    disabled={numRuns >= 20}
-                  >
-                    +
-                  </button>
-                </div>
+          {/* Advanced */}
+          <div className="genmodal-section">
+            <button
+              className="genmodal-advanced-toggle"
+              onClick={() => update({ advancedOpen: !advancedOpen })}
+            >
+              {advancedOpen ? '▾' : '▸'} Advanced
+            </button>
+            {advancedOpen && (
+              <div className="genmodal-advanced">
+                <label className="genmodal-label">Negative Prompt</label>
+                <textarea
+                  className="genmodal-negative-prompt"
+                  value={negativePrompt}
+                  onChange={(e) => update({ negativePrompt: e.target.value })}
+                  placeholder="Things to avoid..."
+                />
               </div>
-              <span className="genmodal-cost">
-                ~${((models.find((m) => m.id === selectedModel)?.cost_per_image ?? 0) * numRuns).toFixed(3)}
-              </span>
-              <button
-                className="btn btn-primary genmodal-generate"
-                onClick={handleGenerate}
-                disabled={!prompt.trim()}
-              >
-                {numRuns > 1 ? `Generate ×${numRuns}` : 'Generate'}
-              </button>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Bottom: Selected references strip */}
-        <div className="genmodal-selected">
-          <div className="genmodal-selected-header">
-            <span className="genmodal-label">
-              References ({selectedRefs.length})
-            </span>
-          </div>
-          <div className="genmodal-selected-strip">
-            {selectedRefs.length === 0 ? (
-              <div className="genmodal-selected-empty">
-                Click images in the gallery to add as references
-              </div>
-            ) : (
-              <>
-                {selectedRefs.map((ref) => (
-                  <div
-                    key={ref.id}
-                    className={`genmodal-selected-thumb ${previewRef?.id === ref.id ? 'genmodal-selected-active' : ''}`}
-                    onClick={() => setPreviewRef(previewRef?.id === ref.id ? null : ref)}
-                  >
-                    <img src={getImageUrl(ref.thumbPath || ref.path)} alt={`#${ref.id}`} />
-                    <span className="genmodal-id">#{ref.id}</span>
-                    <button
-                      className="genmodal-selected-remove"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveRef(ref.id);
-                      }}
-                      title="Remove"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-
-          {/* Preview panel */}
-          {previewRef && (
-            <div className="genmodal-preview">
-              <img src={getImageUrl(previewRef.path)} alt={`#${previewRef.id}`} />
+        {/* Footer */}
+        <div className="genmodal-footer">
+          <div className="genmodal-runs">
+            <label className="genmodal-runs-label">Runs</label>
+            <div className="genmodal-stepper">
+              <button
+                className="genmodal-stepper-btn"
+                onClick={() => update({ numRuns: Math.max(1, numRuns - 1) })}
+                disabled={numRuns <= 1}
+              >
+                −
+              </button>
+              <span className="genmodal-stepper-value">{numRuns}</span>
+              <button
+                className="genmodal-stepper-btn"
+                onClick={() => update({ numRuns: Math.min(20, numRuns + 1) })}
+                disabled={numRuns >= 20}
+              >
+                +
+              </button>
             </div>
-          )}
+          </div>
+          <span className="genmodal-cost">~${estimatedCost.toFixed(3)}</span>
+          <button
+            className="btn btn-primary genmodal-generate"
+            onClick={handleGenerate}
+            disabled={!prompt.trim()}
+          >
+            {numRuns > 1 ? `Generate ×${numRuns}` : 'Generate'}
+          </button>
         </div>
       </div>
 
@@ -467,8 +361,8 @@ export function GenerateModal({
           border: 1px solid var(--border);
           border-radius: var(--radius-lg);
           width: 95%;
-          max-width: 1200px;
-          height: 85vh;
+          max-width: 640px;
+          max-height: 85vh;
           display: flex;
           flex-direction: column;
           box-shadow: var(--shadow-lg);
@@ -479,6 +373,7 @@ export function GenerateModal({
           justify-content: space-between;
           align-items: center;
           padding: var(--spacing-md) var(--spacing-lg);
+          border-bottom: 1px solid var(--border);
         }
 
         .genmodal-header h2 {
@@ -487,110 +382,12 @@ export function GenerateModal({
         }
 
         .genmodal-body {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: var(--spacing-lg);
-          padding: var(--spacing-lg);
-          flex: 1;
-          min-height: 0;
-          overflow: hidden;
-        }
-
-        /* Gallery browser */
-        .genmodal-browser {
-          display: flex;
-          flex-direction: column;
-          min-height: 0;
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          background: var(--bg-primary);
-        }
-
-        .genmodal-search {
-          padding: var(--spacing-sm);
-          border-bottom: 1px solid var(--border);
-        }
-
-        .genmodal-search input {
-          width: 100%;
-          min-height: var(--input-height);
-        }
-
-        .genmodal-gallery {
-          flex: 1;
-          overflow-y: auto;
-          padding: var(--spacing-sm);
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-          grid-auto-rows: 80px;
-          gap: var(--spacing-sm);
-          align-content: start;
-        }
-
-        .genmodal-loading,
-        .genmodal-empty {
-          grid-column: 1 / -1;
-          text-align: center;
-          color: var(--text-muted);
-          padding: var(--spacing-xl);
-        }
-
-        .genmodal-thumb {
-          position: relative;
-          border-radius: var(--radius-sm);
-          overflow: hidden;
-          cursor: pointer;
-          border: 2px solid transparent;
-          transition: all var(--transition-fast);
-        }
-
-        .genmodal-thumb:hover {
-          border-color: var(--accent);
-        }
-
-        .genmodal-thumb-selected {
-          border-color: var(--success);
-        }
-
-        .genmodal-thumb img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .genmodal-check {
-          position: absolute;
-          top: 2px;
-          right: 2px;
-          width: 18px;
-          height: 18px;
-          background: var(--success);
-          color: white;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          font-weight: bold;
-        }
-
-        .genmodal-id {
-          position: absolute;
-          bottom: 2px;
-          left: 2px;
-          background: rgba(0, 0, 0, 0.6);
-          color: white;
-          padding: 1px 4px;
-          border-radius: var(--radius-sm);
-          font-family: var(--font-mono);
-          font-size: 9px;
-        }
-
-        /* Editor */
-        .genmodal-editor {
           display: flex;
           flex-direction: column;
           gap: var(--spacing-md);
+          padding: var(--spacing-lg);
+          flex: 1;
+          min-height: 0;
           overflow-y: auto;
         }
 
@@ -602,7 +399,7 @@ export function GenerateModal({
 
         .genmodal-prompt-section {
           flex: 1;
-          min-height: 150px;
+          min-height: 200px;
         }
 
         .genmodal-label {
@@ -616,21 +413,130 @@ export function GenerateModal({
           color: var(--text-muted);
         }
 
-        .genmodal-prompt {
-          flex: 1;
-          min-height: 120px;
-          resize: vertical;
-          font-size: 15px;
-          line-height: 1.6;
-          padding: var(--spacing-md);
-        }
-
         .genmodal-select,
         .genmodal-input {
           width: 100%;
           min-height: var(--input-height);
           font-size: 14px;
           padding: var(--spacing-sm) var(--spacing-md);
+        }
+
+        /* References row */
+        .genmodal-refs {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-sm);
+          flex-wrap: wrap;
+        }
+
+        .genmodal-ref-thumb {
+          position: relative;
+          width: 48px;
+          height: 48px;
+          border-radius: var(--radius-sm);
+          overflow: hidden;
+          border: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+
+        .genmodal-ref-thumb img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .genmodal-ref-id {
+          position: absolute;
+          bottom: 1px;
+          left: 1px;
+          background: rgba(0, 0, 0, 0.6);
+          color: white;
+          padding: 0 3px;
+          border-radius: var(--radius-sm);
+          font-family: var(--font-mono);
+          font-size: 8px;
+        }
+
+        .genmodal-ref-remove {
+          position: absolute;
+          top: 1px;
+          right: 1px;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: rgba(0, 0, 0, 0.7);
+          color: white;
+          border: none;
+          cursor: pointer;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0;
+          transition: opacity var(--transition-fast), background var(--transition-fast);
+        }
+
+        .genmodal-ref-thumb:hover .genmodal-ref-remove {
+          opacity: 1;
+        }
+
+        .genmodal-ref-remove:hover {
+          background: var(--error);
+        }
+
+        .genmodal-ref-add-wrapper {
+          position: relative;
+        }
+
+        .genmodal-ref-add {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 48px;
+          padding: 0 var(--spacing-md);
+          border: 1px dashed var(--border);
+          border-radius: var(--radius-sm);
+          background: transparent;
+          color: var(--text-muted);
+          font-size: 13px;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          white-space: nowrap;
+        }
+
+        .genmodal-ref-add:hover {
+          border-color: var(--border-light);
+          color: var(--text-primary);
+          background: var(--bg-hover);
+        }
+
+        .genmodal-ref-dropdown {
+          position: absolute;
+          top: calc(100% + var(--spacing-xs));
+          left: 0;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          box-shadow: var(--shadow-lg);
+          z-index: var(--z-dropdown);
+          min-width: 120px;
+          overflow: hidden;
+        }
+
+        .genmodal-ref-option {
+          display: block;
+          width: 100%;
+          padding: var(--spacing-sm) var(--spacing-md);
+          text-align: left;
+          color: var(--text-secondary);
+          font-size: 13px;
+          cursor: pointer;
+          transition: background var(--transition-fast);
+        }
+
+        .genmodal-ref-option:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
         }
 
         /* Lineage */
@@ -642,8 +548,8 @@ export function GenerateModal({
 
         .genmodal-lineage-thumb {
           position: relative;
-          width: 60px;
-          height: 60px;
+          width: 48px;
+          height: 48px;
           border-radius: var(--radius-sm);
           overflow: hidden;
           cursor: pointer;
@@ -666,12 +572,132 @@ export function GenerateModal({
           object-fit: cover;
         }
 
-        .genmodal-actions {
+        .genmodal-id {
+          position: absolute;
+          bottom: 1px;
+          left: 1px;
+          background: rgba(0, 0, 0, 0.6);
+          color: white;
+          padding: 0 3px;
+          border-radius: var(--radius-sm);
+          font-family: var(--font-mono);
+          font-size: 8px;
+        }
+
+        .genmodal-check {
+          position: absolute;
+          top: 1px;
+          right: 1px;
+          width: 16px;
+          height: 16px;
+          background: var(--success);
+          color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 9px;
+          font-weight: bold;
+        }
+
+        /* Prompt */
+        .genmodal-prompt-wrapper {
+          position: relative;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .genmodal-prompt-wrapper .genmodal-prompt {
+          flex: 1;
+        }
+
+        .genmodal-prompt {
+          flex: 1;
+          min-height: 120px;
+          resize: none;
+          font-size: 15px;
+          line-height: 1.7;
+          padding: var(--spacing-md);
+          font-family: var(--font-sans);
+          border-radius: var(--radius-md);
+          background: var(--bg-primary);
+        }
+
+        .genmodal-suggestions {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          box-shadow: var(--shadow-lg);
+          z-index: var(--z-dropdown);
+          max-height: 200px;
+          overflow-y: auto;
+        }
+
+        .genmodal-suggestion {
+          display: block;
+          width: 100%;
+          padding: var(--spacing-sm) var(--spacing-md);
+          text-align: left;
+          color: var(--text-secondary);
+          font-size: 13px;
+          line-height: 1.4;
+          cursor: pointer;
+          transition: background var(--transition-fast);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .genmodal-suggestion:hover {
+          background: var(--bg-hover);
+          color: var(--text-primary);
+        }
+
+        /* Advanced section */
+        .genmodal-advanced-toggle {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-xs);
+          color: var(--text-muted);
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          cursor: pointer;
+          transition: color var(--transition-fast);
+        }
+
+        .genmodal-advanced-toggle:hover {
+          color: var(--text-primary);
+        }
+
+        .genmodal-advanced {
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-xs);
+          margin-top: var(--spacing-xs);
+        }
+
+        .genmodal-negative-prompt {
+          min-height: 60px;
+          resize: vertical;
+          font-size: 13px;
+          line-height: 1.5;
+          padding: var(--spacing-sm) var(--spacing-md);
+        }
+
+        /* Footer */
+        .genmodal-footer {
           display: flex;
           justify-content: flex-end;
           align-items: center;
           gap: var(--spacing-md);
-          padding-top: var(--spacing-sm);
+          padding: var(--spacing-md) var(--spacing-lg);
+          border-top: 1px solid var(--border);
         }
 
         .genmodal-runs {
@@ -743,188 +769,6 @@ export function GenerateModal({
           min-width: 120px;
           min-height: var(--input-height-lg);
           font-size: 15px;
-        }
-
-        /* Selected references strip */
-        .genmodal-selected {
-          border-top: 1px solid var(--border);
-          padding: var(--spacing-md) var(--spacing-lg);
-          display: flex;
-          flex-direction: column;
-          gap: var(--spacing-sm);
-          height: 320px;
-          flex-shrink: 0;
-        }
-
-        .genmodal-selected-header {
-          display: flex;
-          align-items: center;
-          gap: var(--spacing-sm);
-        }
-
-        .genmodal-selected-strip {
-          display: flex;
-          gap: var(--spacing-md);
-          overflow-x: auto;
-          padding: var(--spacing-sm) 0;
-          min-height: 100px;
-        }
-
-        .genmodal-selected-empty {
-          color: var(--text-muted);
-          font-size: 13px;
-          display: flex;
-          align-items: center;
-        }
-
-        .genmodal-selected-thumb {
-          position: relative;
-          flex-shrink: 0;
-          width: 90px;
-          height: 90px;
-          border-radius: var(--radius-md);
-          overflow: hidden;
-          cursor: pointer;
-          border: 2px solid var(--border);
-          transition: all var(--transition-fast);
-        }
-
-        .genmodal-selected-thumb:hover {
-          border-color: var(--accent);
-        }
-
-        .genmodal-selected-active {
-          border-color: var(--accent);
-          box-shadow: 0 0 0 2px var(--accent);
-        }
-
-        .genmodal-selected-thumb img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .genmodal-selected-remove {
-          position: absolute;
-          top: 4px;
-          right: 4px;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          background: rgba(0, 0, 0, 0.7);
-          color: white;
-          border: none;
-          cursor: pointer;
-          font-size: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          opacity: 0;
-          transition: opacity var(--transition-fast), background var(--transition-fast);
-        }
-
-        .genmodal-selected-thumb:hover .genmodal-selected-remove {
-          opacity: 1;
-        }
-
-        .genmodal-selected-remove:hover {
-          background: var(--error);
-        }
-
-        /* Preview panel */
-        .genmodal-preview {
-          margin-top: var(--spacing-sm);
-          max-height: 200px;
-          display: flex;
-          justify-content: center;
-          background: var(--bg-primary);
-          border-radius: var(--radius-md);
-          padding: var(--spacing-sm);
-        }
-
-        .genmodal-preview img {
-          max-width: 100%;
-          max-height: 180px;
-          object-fit: contain;
-          border-radius: var(--radius-sm);
-        }
-
-        /* Prompt wrapper for autocomplete */
-        .genmodal-prompt-wrapper {
-          position: relative;
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .genmodal-prompt-wrapper .genmodal-prompt {
-          flex: 1;
-        }
-
-        .genmodal-suggestions {
-          position: absolute;
-          top: 100%;
-          left: 0;
-          right: 0;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          box-shadow: var(--shadow-lg);
-          z-index: var(--z-dropdown);
-          max-height: 200px;
-          overflow-y: auto;
-        }
-
-        .genmodal-suggestion {
-          display: block;
-          width: 100%;
-          padding: var(--spacing-sm) var(--spacing-md);
-          text-align: left;
-          color: var(--text-secondary);
-          font-size: 13px;
-          line-height: 1.4;
-          cursor: pointer;
-          transition: background var(--transition-fast);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .genmodal-suggestion:hover {
-          background: var(--bg-hover);
-          color: var(--text-primary);
-        }
-
-        /* Advanced section */
-        .genmodal-advanced-toggle {
-          display: flex;
-          align-items: center;
-          gap: var(--spacing-xs);
-          color: var(--text-muted);
-          font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          cursor: pointer;
-          transition: color var(--transition-fast);
-        }
-
-        .genmodal-advanced-toggle:hover {
-          color: var(--text-primary);
-        }
-
-        .genmodal-advanced {
-          display: flex;
-          flex-direction: column;
-          gap: var(--spacing-xs);
-          margin-top: var(--spacing-xs);
-        }
-
-        .genmodal-negative-prompt {
-          min-height: 60px;
-          resize: vertical;
-          font-size: 13px;
-          line-height: 1.5;
-          padding: var(--spacing-sm) var(--spacing-md);
         }
       `}</style>
     </div>

@@ -378,6 +378,13 @@ impl ModelInfo {
                 cost_per_image: 0.06,
                 max_refs: 0,
             },
+            ModelInfo {
+                id: "nano-banana-2".into(),
+                provider: Provider::Fal,
+                display_name: "Nano Banana 2".into(),
+                cost_per_image: 0.08,
+                max_refs: 0,
+            },
             // Z-Image Turbo: $0.005/MP. Routes to image-to-image endpoint when ref provided.
             // Max 1 reference image.
             ModelInfo {

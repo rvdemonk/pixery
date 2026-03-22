@@ -33,6 +33,7 @@ fn resolve_model(model: &str, has_reference: bool) -> &str {
         "imagen4" | "fal-ai/imagen4/preview" => "fal-ai/imagen4/preview",
         "imagen4-fast" | "fal-ai/imagen4/preview/fast" => "fal-ai/imagen4/preview/fast",
         "imagen4-ultra" | "fal-ai/imagen4/preview/ultra" => "fal-ai/imagen4/preview/ultra",
+        "nano-banana-2" | "fal-ai/nano-banana-2" => "fal-ai/nano-banana-2",
         // Z-Image: route to image-to-image endpoint when reference provided
         "z-image" | "fal-ai/z-image/turbo" | "fal-ai/z-image/turbo/image-to-image" => {
             if has_reference {
@@ -59,6 +60,9 @@ struct FalRequest {
     /// Higher = more influence from prompt, lower = more from reference
     #[serde(skip_serializing_if = "Option::is_none")]
     strength: Option<f64>,
+    /// Resolution for models that use resolution strings (e.g. Nano Banana 2: "1K", "2K")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resolution: Option<String>,
 }
 
 /// Response from fal.ai - can be either a queue status or the final result
@@ -144,13 +148,14 @@ pub async fn generate(
         None
     };
 
-    let uses_aspect_ratio = model_id.starts_with("fal-ai/imagen4/");
+    let uses_aspect_ratio = model_id.starts_with("fal-ai/imagen4/") || model_id == "fal-ai/nano-banana-2";
     let request = FalRequest {
         prompt: prompt.to_string(),
         image_url,
         image_size: if uses_aspect_ratio { None } else { Some(resolve_image_size(width, height)) },
         aspect_ratio: if uses_aspect_ratio { Some(resolve_aspect_ratio(width, height)) } else { None },
         strength,
+        resolution: if model_id == "fal-ai/nano-banana-2" { Some("1K".to_string()) } else { None },
     };
 
     let url = format!("{}/{}", API_BASE, model_id);

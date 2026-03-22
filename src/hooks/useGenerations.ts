@@ -77,11 +77,19 @@ export function useGenerations(options: UseGenerationsOptions = {}): UseGenerati
   const [hasMore, setHasMore] = useState(true);
   const isInitialLoad = useRef(true);
   const offsetRef = useRef(0);
+  const refreshingRef = useRef(false);
 
   // Stable filter key excluding pagination params
   const filterDepsKey = getFilterDepsKey(filter);
 
   const fetchGenerations = useCallback(async (append = false) => {
+    // Prevent loadMore from running while a refresh is in-flight.
+    // Without this guard, the IntersectionObserver can fire loadMore
+    // during a refresh (since neither loading nor loadingMore are set),
+    // causing duplicate data and corrupted React keys.
+    if (append && refreshingRef.current) return;
+    if (!append) refreshingRef.current = true;
+
     try {
       if (append) {
         setLoadingMore(true);
@@ -103,8 +111,12 @@ export function useGenerations(options: UseGenerationsOptions = {}): UseGenerati
       setHasMore(data.length === PAGE_SIZE);
 
       if (append) {
-        // Append to existing data
-        setGenerations(prev => [...prev, ...data]);
+        // Append to existing data, deduplicating by ID for safety
+        setGenerations(prev => {
+          const existingIds = new Set(prev.map(g => g.id));
+          const newItems = data.filter(g => !existingIds.has(g.id));
+          return [...prev, ...newItems];
+        });
         offsetRef.current = currentOffset + data.length;
       } else {
         // Replace data (initial load or filter change)
@@ -116,6 +128,7 @@ export function useGenerations(options: UseGenerationsOptions = {}): UseGenerati
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load generations');
     } finally {
+      if (!append) refreshingRef.current = false;
       setLoading(false);
       setLoadingMore(false);
     }

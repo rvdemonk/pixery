@@ -1,18 +1,24 @@
 import { memo } from 'react';
 import type { Generation } from '../lib/types';
+import type { ThumbnailSize } from '../hooks/useSettings';
 import { getImageUrl } from '../lib/api';
 
 interface ThumbnailProps {
   generation: Generation;
   selected: boolean;
   marked?: boolean;
+  picked?: boolean;
+  thumbnailSize: ThumbnailSize;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }
 
-export const Thumbnail = memo(function Thumbnail({ generation, selected, marked, onClick, onDoubleClick, onContextMenu }: ThumbnailProps) {
-  const imageSrc = generation.thumb_path
+const USE_ORIGINAL_SIZES: Set<ThumbnailSize> = new Set(['xl', 'xxl']);
+
+export const Thumbnail = memo(function Thumbnail({ generation, selected, marked, picked, thumbnailSize, onClick, onDoubleClick, onContextMenu }: ThumbnailProps) {
+  const useOriginal = USE_ORIGINAL_SIZES.has(thumbnailSize);
+  const imageSrc = generation.thumb_path && !useOriginal
     ? getImageUrl(generation.thumb_path)
     : getImageUrl(generation.image_path);
 
@@ -27,8 +33,8 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, marked,
       onContextMenu={onContextMenu}
     >
       <img src={imageSrc} alt={generation.slug} loading="lazy" />
-      {marked && (
-        <span className="thumbnail-check">
+      {(marked || picked) && (
+        <span className={`thumbnail-check ${picked ? 'thumbnail-check-picked' : ''}`}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -77,6 +83,9 @@ export const Thumbnail = memo(function Thumbnail({ generation, selected, marked,
           justify-content: center;
           z-index: 3;
           box-shadow: var(--shadow-sm);
+        }
+        .thumbnail-check-picked {
+          background: #818cf8;
         }
         .thumbnail-star {
           position: absolute;
