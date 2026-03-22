@@ -143,8 +143,15 @@ export const Details = memo(function Details({
             <label className="details-label">References</label>
             <div className="references-grid">
               {generation.references.map((ref) => (
-                <div key={ref.id} className="reference-thumb" title={ref.path.split('/').pop()}>
+                <div
+                  key={ref.id}
+                  className="reference-thumb"
+                  title={ref.source_generation_id ? `#${ref.source_generation_id}` : ref.path.split('/').pop()}
+                >
                   <img src={getImageUrl(ref.path)} alt="Reference" />
+                  {ref.source_generation_id && (
+                    <span className="ref-id-badge">#{ref.source_generation_id}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -530,6 +537,7 @@ export const Details = memo(function Details({
           cursor: pointer;
           border: 1px solid var(--border);
           transition: border-color var(--transition-fast);
+          position: relative;
         }
         .reference-thumb:hover {
           border-color: var(--accent);
@@ -538,6 +546,22 @@ export const Details = memo(function Details({
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+        .ref-id-badge {
+          display: none;
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background: rgba(0, 0, 0, 0.75);
+          color: #fff;
+          font-size: 10px;
+          font-family: var(--font-mono);
+          text-align: center;
+          padding: 1px 0;
+        }
+        .reference-thumb:hover .ref-id-badge {
+          display: block;
         }
 
         /* Prompt */

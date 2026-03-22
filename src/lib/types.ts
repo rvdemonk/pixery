@@ -30,6 +30,7 @@ export interface GenerateParams {
   model: string;
   tags: string[];
   reference_paths: string[];
+  reference_source_ids: (number | null)[];
   copy_to: string | null;
   negative_prompt: string | null;
   width: number | null;
@@ -97,6 +98,7 @@ export interface Reference {
   hash: string;
   path: string;
   created_at: string;
+  source_generation_id: number | null;
 }
 
 export interface SelectedRef {

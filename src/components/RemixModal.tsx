@@ -7,7 +7,7 @@ interface RemixModalProps {
   models: ModelInfo[];
   references: Reference[];
   onClose: () => void;
-  onGenerate: (prompt: string, model: string, referencePaths: string[], tags: string[], numRuns?: number) => void;
+  onGenerate: (prompt: string, model: string, referencePaths: string[], tags: string[], numRuns?: number, referenceSourceIds?: (number | null)[]) => void;
   onAddReference: () => void;
   onRemoveReference: (refId: number) => void;
 }
@@ -35,11 +35,12 @@ export function RemixModal({
 
   const handleGenerate = () => {
     const referencePaths = references.map((ref) => ref.path);
+    const referenceSourceIds = references.map((ref) => ref.source_generation_id);
     const tags = tagsInput
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    onGenerate(prompt, selectedModel, referencePaths, tags, numRuns);
+    onGenerate(prompt, selectedModel, referencePaths, tags, numRuns, referenceSourceIds);
   };
 
   return (

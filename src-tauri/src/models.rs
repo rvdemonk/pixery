@@ -334,21 +334,21 @@ impl ModelInfo {
                 provider: Provider::Fal,
                 display_name: "FLUX 2 Turbo".into(),
                 cost_per_image: 0.008,
-                max_refs: 0,
+                max_refs: 4,
             },
             ModelInfo {
                 id: "flux2-pro".into(),
                 provider: Provider::Fal,
                 display_name: "FLUX 2 Pro".into(),
                 cost_per_image: 0.03,
-                max_refs: 0,
+                max_refs: 4,
             },
             ModelInfo {
                 id: "flux2-max".into(),
                 provider: Provider::Fal,
                 display_name: "FLUX 2 Max".into(),
                 cost_per_image: 0.07,
-                max_refs: 0,
+                max_refs: 4,
             },
             ModelInfo {
                 id: "flux2-hdr".into(),
@@ -480,6 +480,8 @@ pub struct GenerateParams {
     pub model: String,
     pub tags: Vec<String>,
     pub reference_paths: Vec<String>,
+    #[serde(default)]
+    pub reference_source_ids: Vec<Option<i64>>,
     pub copy_to: Option<String>,
     pub negative_prompt: Option<String>,
     pub width: Option<i32>,
@@ -493,6 +495,7 @@ pub struct Reference {
     pub hash: String,
     pub path: String,
     pub created_at: String,
+    pub source_generation_id: Option<i64>,
 }
 
 /// Tag with usage count

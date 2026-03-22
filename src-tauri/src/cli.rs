@@ -622,7 +622,7 @@ pub fn run(cmd: Commands) -> Result<()> {
             if !reference.is_empty() {
                 for ref_path in &reference {
                     let (hash, stored_path) = archive::store_reference(ref_path)?;
-                    let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap())?;
+                    let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap(), None)?;
                     db.link_reference(id, ref_id)?;
                 }
                 updates.push("references");
@@ -1141,7 +1141,7 @@ fn import_image(
     // Store and link reference images
     for ref_path in reference_paths {
         let (hash, stored_path) = archive::store_reference(std::path::Path::new(ref_path))?;
-        let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap())?;
+        let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap(), None)?;
         db.link_reference(gen_id, ref_id)?;
     }
 

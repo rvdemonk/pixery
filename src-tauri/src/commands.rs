@@ -57,6 +57,7 @@ pub async fn generate_image(
         &provider,
         &params.tags,
         &params.reference_paths,
+        &params.reference_source_ids,
         &result,
         estimated_cost,
         params.negative_prompt.as_deref(),

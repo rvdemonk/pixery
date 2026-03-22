@@ -26,9 +26,27 @@ fn resolve_model(model: &str, has_reference: bool) -> &str {
         "flux-pro" | "fal-ai/flux-pro/v1.1" => "fal-ai/flux-pro/v1.1",
         "flux-ultra" | "fal-ai/flux-pro/v1.1-ultra" => "fal-ai/flux-pro/v1.1-ultra",
         "recraft" | "fal-ai/recraft-v3" => "fal-ai/recraft-v3",
-        "flux2-turbo" | "fal-ai/flux-2/turbo" => "fal-ai/flux-2/turbo",
-        "flux2-pro" | "fal-ai/flux-2-pro" => "fal-ai/flux-2-pro",
-        "flux2-max" | "fal-ai/flux-2-max" => "fal-ai/flux-2-max",
+        "flux2-turbo" | "fal-ai/flux-2/turbo" => {
+            if has_reference {
+                "fal-ai/flux-2/turbo/edit"
+            } else {
+                "fal-ai/flux-2/turbo"
+            }
+        }
+        "flux2-pro" | "fal-ai/flux-2-pro" => {
+            if has_reference {
+                "fal-ai/flux-2-pro/edit"
+            } else {
+                "fal-ai/flux-2-pro"
+            }
+        }
+        "flux2-max" | "fal-ai/flux-2-max" => {
+            if has_reference {
+                "fal-ai/flux-2-max/edit"
+            } else {
+                "fal-ai/flux-2-max"
+            }
+        }
         "flux2-hdr" | "fal-ai/flux-2-lora-gallery/hdr-style" => "fal-ai/flux-2-lora-gallery/hdr-style",
         "imagen4" | "fal-ai/imagen4/preview" => "fal-ai/imagen4/preview",
         "imagen4-fast" | "fal-ai/imagen4/preview/fast" => "fal-ai/imagen4/preview/fast",
@@ -51,6 +69,9 @@ struct FalRequest {
     prompt: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     image_url: Option<String>,
+    /// Multiple image URLs for edit endpoints (e.g. FLUX 2 Pro/Max edit)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    image_urls: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     image_size: Option<String>,
     /// Aspect ratio for models that use ratio strings (e.g. Imagen 4: "1:1", "16:9")
@@ -130,18 +151,41 @@ pub async fn generate(
     let has_reference = !reference_paths.is_empty();
     let model_id = resolve_model(model, has_reference);
 
-    // Build image_url from reference if provided (max 1 for Z-Image)
-    let image_url = if let Some(ref_path) = reference_paths.first() {
-        let path = Path::new(ref_path);
-        let data = std::fs::read(path).context("Failed to read reference image")?;
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
-        let mime = super::mime_type(path);
-        Some(format!("data:{};base64,{}", mime, b64))
+    let is_edit = model_id.ends_with("/edit");
+
+    // Build image_url (singular) for Z-Image image-to-image
+    let image_url = if !is_edit {
+        if let Some(ref_path) = reference_paths.first() {
+            let path = Path::new(ref_path);
+            let data = std::fs::read(path).context("Failed to read reference image")?;
+            let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
+            let mime = super::mime_type(path);
+            Some(format!("data:{};base64,{}", mime, b64))
+        } else {
+            None
+        }
     } else {
         None
     };
 
-    // Set strength for image-to-image models (0.6 default balances prompt vs reference)
+    // Build image_urls (plural) for FLUX 2 edit endpoints
+    let image_urls = if is_edit && !reference_paths.is_empty() {
+        let urls: Result<Vec<String>> = reference_paths
+            .iter()
+            .map(|ref_path| {
+                let path = Path::new(ref_path);
+                let data = std::fs::read(path).context("Failed to read reference image")?;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
+                let mime = super::mime_type(path);
+                Ok(format!("data:{};base64,{}", mime, b64))
+            })
+            .collect();
+        Some(urls?)
+    } else {
+        None
+    };
+
+    // Set strength for Z-Image image-to-image only (0.6 default balances prompt vs reference)
     let strength = if has_reference && model_id.contains("image-to-image") {
         Some(0.6)
     } else {
@@ -152,6 +196,7 @@ pub async fn generate(
     let request = FalRequest {
         prompt: prompt.to_string(),
         image_url,
+        image_urls,
         image_size: if uses_aspect_ratio { None } else { Some(resolve_image_size(width, height)) },
         aspect_ratio: if uses_aspect_ratio { Some(resolve_aspect_ratio(width, height)) } else { None },
         strength,

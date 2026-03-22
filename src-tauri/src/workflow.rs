@@ -39,6 +39,7 @@ pub fn complete_generation(
     provider: &str,
     tags: &[String],
     reference_paths: &[String],
+    reference_source_ids: &[Option<i64>],
     result: &GenerationResult,
     estimated_cost: Option<f64>,
     negative_prompt: Option<&str>,
@@ -76,9 +77,10 @@ pub fn complete_generation(
         db.add_tags(gen_id, tags)?;
     }
 
-    for ref_path in reference_paths {
+    for (i, ref_path) in reference_paths.iter().enumerate() {
         let (hash, stored_path) = archive::store_reference(Path::new(ref_path))?;
-        let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap())?;
+        let source_id = reference_source_ids.get(i).copied().flatten();
+        let ref_id = db.get_or_create_reference(&hash, stored_path.to_str().unwrap(), source_id)?;
         db.link_reference(gen_id, ref_id)?;
     }
 
@@ -123,6 +125,7 @@ pub async fn perform_generation(
         &provider,
         tags,
         reference_paths,
+        &[], // CLI doesn't track source generation IDs
         &result,
         estimated_cost,
         negative_prompt,

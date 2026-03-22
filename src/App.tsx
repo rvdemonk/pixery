@@ -371,6 +371,7 @@ export default function App() {
         hash: '',
         path: r.path,
         created_at: '',
+        source_generation_id: r.id > 0 ? r.id : null,
       })));
       setRemixOpen(true);
     }
@@ -421,7 +422,7 @@ export default function App() {
   }, []);
 
   // Generate from remix modal
-  const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[], tags: string[], numRuns: number = 1) => {
+  const handleRemixGenerate = useCallback(async (prompt: string, model: string, referencePaths: string[], tags: string[], numRuns: number = 1, referenceSourceIds: (number | null)[] = []) => {
     if (!selectedGeneration) return;
     setRemixOpen(false);
     const results = await generate({
@@ -429,6 +430,7 @@ export default function App() {
       model,
       tags,
       reference_paths: referencePaths,
+      reference_source_ids: referenceSourceIds,
       copy_to: null,
       negative_prompt: null,
       width: null,
@@ -470,13 +472,14 @@ export default function App() {
     refresh();
   }, [selectedId, refresh]);
 
-  const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[], referencePaths: string[], negativePrompt: string | null = null, numRuns: number = 1) => {
+  const handleGenerate = useCallback(async (prompt: string, model: string, genTags: string[], referencePaths: string[], negativePrompt: string | null = null, numRuns: number = 1, referenceSourceIds: (number | null)[] = []) => {
     closeGenerateModal();
     const results = await generate({
       prompt,
       model,
       tags: genTags,
       reference_paths: referencePaths,
+      reference_source_ids: referenceSourceIds,
       copy_to: null,
       negative_prompt: negativePrompt,
       width: null,

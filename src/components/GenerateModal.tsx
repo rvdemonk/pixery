@@ -8,7 +8,7 @@ interface GenerateModalProps {
   lineage: SelectedRef[];
   onFormChange: (state: GenerateFormState) => void;
   onClose: () => void;
-  onGenerate: (prompt: string, model: string, tags: string[], referencePaths: string[], negativePrompt: string | null, numRuns?: number) => void;
+  onGenerate: (prompt: string, model: string, tags: string[], referencePaths: string[], negativePrompt: string | null, numRuns?: number, referenceSourceIds?: (number | null)[]) => void;
   onPickFromGallery: () => void;
   onPickFromFile: () => void;
   onRemoveRef: (refId: number) => void;
@@ -124,11 +124,12 @@ export function GenerateModal({
 
   const handleGenerate = () => {
     const referencePaths = references.map((ref) => ref.path);
+    const referenceSourceIds = references.map((ref) => ref.id > 0 ? ref.id : null);
     const tags = tagsInput
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    onGenerate(prompt, selectedModel, tags, referencePaths, negativePrompt.trim() || null, numRuns);
+    onGenerate(prompt, selectedModel, tags, referencePaths, negativePrompt.trim() || null, numRuns, referenceSourceIds);
   };
 
   const selectedRefIds = new Set(references.map((r) => r.id));

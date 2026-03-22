@@ -161,6 +161,12 @@ impl Database {
             [],
         );
 
+        // Add source_generation_id to refs table
+        let _ = self.conn.execute(
+            "ALTER TABLE refs ADD COLUMN source_generation_id INTEGER",
+            [],
+        );
+
         Ok(())
     }
 
@@ -571,7 +577,7 @@ impl Database {
     fn get_references_for_generations(&self, ids: &[i64]) -> Result<HashMap<i64, Vec<Reference>>> {
         let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
-            "SELECT gr.generation_id, r.id, r.hash, r.path, r.created_at
+            "SELECT gr.generation_id, r.id, r.hash, r.path, r.created_at, r.source_generation_id
              FROM refs r
              JOIN generation_refs gr ON r.id = gr.ref_id
              WHERE gr.generation_id IN ({})",
@@ -590,6 +596,7 @@ impl Database {
                     hash: row.get(2)?,
                     path: row.get(3)?,
                     created_at: row.get(4)?,
+                    source_generation_id: row.get(5)?,
                 },
             ))
         })?;
@@ -674,21 +681,28 @@ impl Database {
 
     // Reference operations
 
-    pub fn get_or_create_reference(&self, hash: &str, path: &str) -> Result<i64> {
-        let existing: Option<i64> = self
+    pub fn get_or_create_reference(&self, hash: &str, path: &str, source_generation_id: Option<i64>) -> Result<i64> {
+        let existing: Option<(i64, Option<i64>)> = self
             .conn
-            .query_row("SELECT id FROM refs WHERE hash = ?1", params![hash], |row| {
-                row.get(0)
+            .query_row("SELECT id, source_generation_id FROM refs WHERE hash = ?1", params![hash], |row| {
+                Ok((row.get(0)?, row.get(1)?))
             })
             .optional()?;
 
-        if let Some(id) = existing {
+        if let Some((id, existing_source)) = existing {
+            // Backfill source_generation_id if we now know it
+            if existing_source.is_none() && source_generation_id.is_some() {
+                let _ = self.conn.execute(
+                    "UPDATE refs SET source_generation_id = ?1 WHERE id = ?2",
+                    params![source_generation_id, id],
+                );
+            }
             return Ok(id);
         }
 
         self.conn.execute(
-            "INSERT INTO refs (hash, path) VALUES (?1, ?2)",
-            params![hash, path],
+            "INSERT INTO refs (hash, path, source_generation_id) VALUES (?1, ?2, ?3)",
+            params![hash, path, source_generation_id],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
@@ -704,7 +718,7 @@ impl Database {
     pub fn get_reference_by_hash(&self, hash: &str) -> Result<Option<Reference>> {
         self.conn
             .query_row(
-                "SELECT id, hash, path, created_at FROM refs WHERE hash = ?1",
+                "SELECT id, hash, path, created_at, source_generation_id FROM refs WHERE hash = ?1",
                 params![hash],
                 |row| {
                     Ok(Reference {
@@ -712,6 +726,7 @@ impl Database {
                         hash: row.get(1)?,
                         path: row.get(2)?,
                         created_at: row.get(3)?,
+                        source_generation_id: row.get(4)?,
                     })
                 },
             )
@@ -721,7 +736,7 @@ impl Database {
 
     pub fn get_references_for_generation(&self, generation_id: i64) -> Result<Vec<Reference>> {
         let mut stmt = self.conn.prepare(
-            "SELECT r.id, r.hash, r.path, r.created_at
+            "SELECT r.id, r.hash, r.path, r.created_at, r.source_generation_id
              FROM refs r
              JOIN generation_refs gr ON r.id = gr.ref_id
              WHERE gr.generation_id = ?1",
@@ -733,6 +748,7 @@ impl Database {
                 hash: row.get(1)?,
                 path: row.get(2)?,
                 created_at: row.get(3)?,
+                source_generation_id: row.get(4)?,
             })
         })?;
 
