@@ -69,4 +69,4 @@ Run `pixery --help` (or `pixery <command> --help`) for the full command set — 
 
 ## License
 
-Personal project. No license granted — see the repository owner.
+MIT — see [LICENSE](LICENSE).
